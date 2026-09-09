@@ -1,0 +1,6 @@
+venv/
+logs/
+__pycache__/
+*.pyc
+AgentMonitor.app/
+.DS_Store

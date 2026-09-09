@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Archivo:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #12100d;
+  --bg-raised: #1a1713;
+  --bg-inset: #0c0b09;
+  --line: #2e2820;
+  --line-bright: #453c2e;
+  --text: #d8cfbe;
+  --text-dim: #8a7f6a;
+  --amber: #ffb347;
+  --amber-dim: #a86f1f;
+  --green: #7dd181;
+  --red: #e46a5a;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --display: "Archivo", "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--bg); }
+body {
+  font-family: var(--mono);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,179,71,0.012) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse 120% 80% at 50% -20%, #1e1a13 0%, var(--bg) 60%);
+}
+::selection { background: var(--amber); color: var(--bg); }
+
+/* -------- header -------- */
+header {
+  display: flex; align-items: baseline; gap: 16px;
+  padding: 22px 28px 0;
+  border-bottom: 1px solid var(--line);
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+header h1::before { content: "▞▞ "; color: var(--amber-dim); }
+#clock { margin-left: auto; color: var(--text-dim); font-size: 12px; }
+nav { display: flex; gap: 2px; margin-top: 14px; }
+nav button {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 1px;
+  text-transform: uppercase;
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--line); border-bottom: none;
+  padding: 8px 22px; cursor: pointer;
+}
+nav button.active {
+  background: var(--bg-raised); color: var(--amber);
+  border-color: var(--line-bright);
+  box-shadow: inset 0 2px 0 var(--amber);
+}
+nav button:hover:not(.active) { color: var(--text); }
+
+main { padding: 24px 28px 60px; max-width: 1180px; }
+.pane { display: none; }
+.pane.active { display: block; animation: rise .25s ease-out; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+/* -------- shared bits -------- */
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+.dot.on  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot.off { background: transparent; border: 1px solid var(--text-dim); }
+.dot.err { background: var(--red); box-shadow: 0 0 6px var(--red); border-radius: 1px; }
+button.act {
+  font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+  background: var(--bg-inset); color: var(--text);
+  border: 1px solid var(--line-bright); padding: 4px 12px; cursor: pointer;
+}
+button.act:hover { border-color: var(--amber); color: var(--amber); }
+button.act.primary { color: var(--amber); border-color: var(--amber-dim); }
+button.act.primary:hover { background: var(--amber); color: var(--bg); }
+.muted { color: var(--text-dim); }
+.empty { color: var(--text-dim); padding: 30px 0; }
+.grouphead {
+  margin: 22px 0 8px; font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--amber-dim);
+}
+.grouphead::after { content: " ────────────────────"; color: var(--line-bright); }
+
+/* -------- tables -------- */
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim); font-weight: 400;
+  border-bottom: 1px solid var(--line-bright); padding: 6px 10px;
+}
+td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:hover td { background: rgba(255,179,71,0.03); }
+td .sub { color: var(--text-dim); font-size: 11px; }
+td.actions { white-space: nowrap; text-align: right; }
+td.actions button { margin-left: 6px; }
+
+/* -------- log / editor drawer -------- */
+#drawer {
+  position: fixed; inset: auto 0 0 0; max-height: 55vh;
+  background: var(--bg-inset); border-top: 2px solid var(--amber-dim);
+  display: none; flex-direction: column; z-index: 10;
+}
+#drawer.open { display: flex; }
+#drawer .bar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 20px; border-bottom: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+#drawer .bar .title { color: var(--amber); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#drawer .bar .spacer { flex: 1; }
+#drawer pre, #drawer textarea {
+  flex: 1; overflow: auto; padding: 14px 20px;
+  font-family: var(--mono); font-size: 12px; line-height: 1.55;
+  color: var(--text); background: transparent; border: none; outline: none;
+  white-space: pre-wrap; word-break: break-word; resize: none;
+}
+#drawer textarea { min-height: 34vh; }
+
+#toast {
+  position: fixed; top: 18px; right: 22px; z-index: 20;
+  background: var(--bg-raised); border: 1px solid var(--amber-dim);
+  color: var(--amber); padding: 8px 16px; font-size: 12px;
+  opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent Monitor</h1>
+  <span id="summary" class="muted"></span>
+  <span id="clock"></span>
+</header>
+<nav>
+  <div style="width:28px"></div>
+  <button data-pane="agents" class="active">Agents</button>
+  <button data-pane="sessions">Sessions</button>
+  <button data-pane="prompts">Prompts</button>
+</nav>
+<main>
+  <section id="agents" class="pane active"><div class="empty">Loading agents...</div></section>
+  <section id="sessions" class="pane"><div class="empty">Loading sessions...</div></section>
+  <section id="prompts" class="pane"><div class="empty">Loading prompt files...</div></section>
+</main>
+
+<div id="drawer">
+  <div class="bar">
+    <span class="title" id="drawer-title"></span>
+    <span class="spacer"></span>
+    <button class="act primary" id="drawer-save" style="display:none">Save</button>
+    <button class="act" id="drawer-close">Close</button>
+  </div>
+  <pre id="drawer-pre"></pre>
+  <textarea id="drawer-edit" spellcheck="false" style="display:none"></textarea>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function toast(msg, ms = 2200) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+/* -------- tabs -------- */
+document.querySelectorAll("nav button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".pane").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    $("#" + btn.dataset.pane).classList.add("active");
+  });
+});
+
+/* -------- clock -------- */
+setInterval(() => {
+  $("#clock").textContent = new Date().toLocaleTimeString([], {hour12: false});
+}, 1000);
+
+/* -------- drawer -------- */
+let drawerSaveHandler = null;
+function openDrawer(title, { text, editable } = {}) {
+  $("#drawer-title").textContent = title;
+  $("#drawer-pre").style.display = editable ? "none" : "block";
+  $("#drawer-edit").style.display = editable ? "block" : "none";
+  $("#drawer-save").style.display = editable ? "inline-block" : "none";
+  if (editable) $("#drawer-edit").value = text;
+  else $("#drawer-pre").textContent = text;
+  $("#drawer").classList.add("open");
+  if (!editable) { const p = $("#drawer-pre"); p.scrollTop = p.scrollHeight; }
+}
+$("#drawer-close").addEventListener("click", () => $("#drawer").classList.remove("open"));
+$("#drawer-save").addEventListener("click", () => drawerSaveHandler && drawerSaveHandler());
+
+/* -------- agents -------- */
+async function loadAgents() {
+  let agents;
+  try { agents = await api("/api/agents"); }
+  catch (e) { $("#agents").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; return; }
+
+  const running = agents.filter(a => a.running).length;
+  $("#summary").textContent = `${running} running / ${agents.length} agents`;
+  if (!agents.length) {
+    $("#agents").innerHTML = `<div class="empty">No LaunchAgents matched. Adjust launchagent_patterns in ~/.config/agent-monitor/config.json</div>`;
+    return;
+  }
+
+  const groups = {};
+  agents.forEach(a => (groups[a.group || ""] = groups[a.group || ""] || []).push(a));
+  const keys = Object.keys(groups).sort((a, b) => (a === "") ? -1 : (b === "") ? 1 : a.localeCompare(b));
+
+  let html = "";
+  for (const key of keys) {
+    if (key) html += `<div class="grouphead">${esc(key)}</div>`;
+    html += `<table><tr><th style="width:34%">Agent</th><th>Status</th><th>Schedule</th><th style="text-align:right">Actions</th></tr>`;
+    for (const a of groups[key]) {
+      const dot = a.running ? "on" : a.error ? "err" : "off";
+      const status = a.running ? `PID ${esc(a.pid)}`
+        : a.error ? `exit ${esc(a.exit_code)}`
+        : a.loaded ? "loaded" : "not loaded";
+      html += `<tr>
+        <td><span class="dot ${dot}"></span>${esc(a.name)}<div class="sub">${esc(a.label)}</div></td>
+        <td>${status}${a.keep_alive ? '<div class="sub">keepalive</div>' : ""}</td>
+        <td>${esc(a.schedule)}</td>
+        <td class="actions">
+          ${a.stdout_log ? `<button class="act" data-log="${esc(a.label)}" data-which="stdout">log</button>` : ""}
+          ${a.stderr_log ? `<button class="act" data-log="${esc(a.label)}" data-which="stderr">err</button>` : ""}
+          ${a.running
+            ? `<button class="act" data-do="restart" data-label="${esc(a.label)}">restart</button>
+               <button class="act" data-do="stop" data-label="${esc(a.label)}">stop</button>`
+            : `<button class="act primary" data-do="start" data-label="${esc(a.label)}">start</button>`}
+        </td></tr>`;
+    }
+    html += `</table>`;
+  }
+  $("#agents").innerHTML = html;
+
+  $("#agents").querySelectorAll("[data-do]").forEach(btn => btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try {
+      await api(`/api/agents/${encodeURIComponent(btn.dataset.label)}/${btn.dataset.do}`, {method: "POST"});
+      toast(`${btn.dataset.do}: ${btn.dataset.label}`);
+    } catch (e) { toast("Error: " + e.message); }
+    setTimeout(loadAgents, 600);
+  }));
+  $("#agents").querySelectorAll("[data-log]").forEach(btn => btn.addEventListener("click", async () => {
+    try {
+      const d = await api(`/api/agents/${encodeURIComponent(btn.dataset.log)}/log?which=${btn.dataset.which}&lines=300`);
+      openDrawer(d.path, { text: d.content || "(empty)" });
+    } catch (e) { toast("Error: " + e.message); }
+  }));
+}
+
+/* -------- sessions -------- */
+function ageStr(mtime) {
+  const d = Date.now() / 1000 - mtime;
+  if (d < 3600) return Math.max(1, Math.floor(d / 60)) + "m";
+  if (d < 86400) return Math.floor(d / 3600) + "h";
+  return Math.floor(d / 86400) + "d";
+}
+async function loadSessions() {
+  let list;
+  try { list = await api("/api/sessions?limit=60"); }
+  catch (e) { $("#sessions").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; return; }
+  if (!list.length) {
+    $("#sessions").innerHTML = `<div class="empty">No Claude Code sessions found.</div>`;
+    return;
+  }
+  let html = `<table><tr><th style="width:6%">Age</th><th style="width:18%">Project</th><th>Last prompt / summary</th><th style="width:8%">Branch</th><th style="text-align:right;width:16%">Actions</th></tr>`;
+  for (const s of list) {
+    const proj = s.cwd ? s.cwd.split("/").filter(Boolean).pop() : s.project;
+    html += `<tr>
+      <td>${ageStr(s.mtime)}</td>
+      <td>${esc(proj)}<div class="sub">${esc(s.cwd || "")}</div></td>
+      <td>${esc(s.title)}<div class="sub">${esc(s.id)}</div></td>
+      <td>${esc(s.branch || "")}</td>
+      <td class="actions">
+        <button class="act" data-copy="${esc(s.id)}" data-cwd="${esc(s.cwd || "")}">copy cmd</button>
+        <button class="act primary" data-resume="${esc(s.id)}">resume</button>
+      </td></tr>`;
+  }
+  html += `</table>`;
+  $("#sessions").innerHTML = html;
+
+  $("#sessions").querySelectorAll("[data-resume]").forEach(btn => btn.addEventListener("click", async () => {
+    btn.disabled = true; btn.textContent = "opening...";
+    try {
+      const d = await api(`/api/sessions/${btn.dataset.resume}/resume`, {method: "POST"});
+      toast("Opened terminal: " + d.command, 3500);
+    } catch (e) { toast("Error: " + e.message, 4000); }
+    btn.disabled = false; btn.textContent = "resume";
+  }));
+  $("#sessions").querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", () => {
+    const cwd = btn.dataset.cwd;
+    const cmd = (cwd ? `cd '${cwd}' && ` : "") + `claude --resume ${btn.dataset.copy}`;
+    navigator.clipboard.writeText(cmd);
+    toast("Copied: " + cmd, 3000);
+  }));
+}
+
+/* -------- prompts -------- */
+async function loadPrompts() {
+  let files;
+  try { files = await api("/api/prompts"); }
+  catch (e) { $("#prompts").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; return; }
+  if (!files.length) {
+    $("#prompts").innerHTML = `<div class="empty">No prompt files found. Add prompt_dirs to ~/.config/agent-monitor/config.json</div>`;
+    return;
+  }
+  let html = `<table><tr><th>File</th><th>Source</th><th style="width:8%">Size</th><th style="text-align:right;width:10%"></th></tr>`;
+  for (const f of files) {
+    html += `<tr>
+      <td>${esc(f.name)}<div class="sub">${esc(f.path)}</div></td>
+      <td>${f.agent_label ? esc(f.agent_label) : '<span class="muted">prompt dir</span>'}</td>
+      <td>${(f.size / 1024).toFixed(1)}k</td>
+      <td class="actions"><button class="act primary" data-edit="${esc(f.path)}">edit</button></td></tr>`;
+  }
+  html += `</table>`;
+  $("#prompts").innerHTML = html;
+
+  $("#prompts").querySelectorAll("[data-edit]").forEach(btn => btn.addEventListener("click", async () => {
+    const path = btn.dataset.edit;
+    try {
+      const d = await api(`/api/prompts/file?path=${encodeURIComponent(path)}`);
+      openDrawer(path, { text: d.content, editable: true });
+      drawerSaveHandler = async () => {
+        try {
+          await api("/api/prompts/file", {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ path, content: $("#drawer-edit").value }),
+          });
+          toast("Saved " + path);
+          $("#drawer").classList.remove("open");
+          loadPrompts();
+        } catch (e) { toast("Save failed: " + e.message, 4000); }
+      };
+    } catch (e) { toast("Error: " + e.message); }
+  }));
+}
+
+loadAgents(); loadSessions(); loadPrompts();
+setInterval(loadAgents, 15000);
+setInterval(loadSessions, 30000);
+</script>
+</body>
+</html>
