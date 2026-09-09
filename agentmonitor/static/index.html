@@ -101,12 +101,35 @@ th {
   border-bottom: 1px solid var(--line-bright); padding: 6px 10px;
 }
 td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-tr:hover td { background: rgba(255,179,71,0.03); }
+tr.rowhover:hover td { background: rgba(255,179,71,0.03); }
 td .sub { color: var(--text-dim); font-size: 11px; }
 td.actions { white-space: nowrap; text-align: right; }
 td.actions button { margin-left: 6px; }
 
-/* -------- log / editor drawer -------- */
+/* -------- prompt chips + inline editor -------- */
+.chip {
+  display: inline-block; margin: 1px 6px 1px 0; padding: 1px 9px;
+  font-family: var(--mono); font-size: 11px;
+  background: var(--bg-inset); color: var(--text);
+  border: 1px solid var(--line-bright); border-radius: 2px; cursor: pointer;
+}
+.chip::before { content: "¶ "; color: var(--amber-dim); }
+.chip:hover, .chip.open { border-color: var(--amber); color: var(--amber); }
+tr.editor td { background: var(--bg-inset); padding: 0; }
+.editorbox { display: flex; flex-direction: column; border-left: 2px solid var(--amber-dim); }
+.editorbox .ebar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 7px 14px; border-bottom: 1px solid var(--line);
+}
+.editorbox .ebar .path { color: var(--amber); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editorbox .ebar .spacer { flex: 1; }
+.editorbox textarea {
+  font-family: var(--mono); font-size: 12px; line-height: 1.55;
+  color: var(--text); background: transparent; border: none; outline: none;
+  padding: 12px 14px; min-height: 240px; resize: vertical;
+}
+
+/* -------- log drawer -------- */
 #drawer {
   position: fixed; inset: auto 0 0 0; max-height: 55vh;
   background: var(--bg-inset); border-top: 2px solid var(--amber-dim);
@@ -120,13 +143,11 @@ td.actions button { margin-left: 6px; }
 }
 #drawer .bar .title { color: var(--amber); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #drawer .bar .spacer { flex: 1; }
-#drawer pre, #drawer textarea {
+#drawer pre {
   flex: 1; overflow: auto; padding: 14px 20px;
-  font-family: var(--mono); font-size: 12px; line-height: 1.55;
-  color: var(--text); background: transparent; border: none; outline: none;
-  white-space: pre-wrap; word-break: break-word; resize: none;
+  font-size: 12px; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word;
 }
-#drawer textarea { min-height: 34vh; }
 
 #toast {
   position: fixed; top: 18px; right: 22px; z-index: 20;
@@ -147,23 +168,19 @@ td.actions button { margin-left: 6px; }
   <div style="width:28px"></div>
   <button data-pane="agents" class="active">Agents</button>
   <button data-pane="sessions">Sessions</button>
-  <button data-pane="prompts">Prompts</button>
 </nav>
 <main>
   <section id="agents" class="pane active"><div class="empty">Loading agents...</div></section>
   <section id="sessions" class="pane"><div class="empty">Loading sessions...</div></section>
-  <section id="prompts" class="pane"><div class="empty">Loading prompt files...</div></section>
 </main>
 
 <div id="drawer">
   <div class="bar">
     <span class="title" id="drawer-title"></span>
     <span class="spacer"></span>
-    <button class="act primary" id="drawer-save" style="display:none">Save</button>
     <button class="act" id="drawer-close">Close</button>
   </div>
   <pre id="drawer-pre"></pre>
-  <textarea id="drawer-edit" spellcheck="false" style="display:none"></textarea>
 </div>
 <div id="toast"></div>
 
@@ -203,32 +220,49 @@ setInterval(() => {
   $("#clock").textContent = new Date().toLocaleTimeString([], {hour12: false});
 }, 1000);
 
-/* -------- drawer -------- */
-let drawerSaveHandler = null;
-function openDrawer(title, { text, editable } = {}) {
+/* -------- log drawer -------- */
+function openDrawer(title, text) {
   $("#drawer-title").textContent = title;
-  $("#drawer-pre").style.display = editable ? "none" : "block";
-  $("#drawer-edit").style.display = editable ? "block" : "none";
-  $("#drawer-save").style.display = editable ? "inline-block" : "none";
-  if (editable) $("#drawer-edit").value = text;
-  else $("#drawer-pre").textContent = text;
+  $("#drawer-pre").textContent = text;
   $("#drawer").classList.add("open");
-  if (!editable) { const p = $("#drawer-pre"); p.scrollTop = p.scrollHeight; }
+  const p = $("#drawer-pre"); p.scrollTop = p.scrollHeight;
 }
 $("#drawer-close").addEventListener("click", () => $("#drawer").classList.remove("open"));
-$("#drawer-save").addEventListener("click", () => drawerSaveHandler && drawerSaveHandler());
 
-/* -------- agents -------- */
+/* -------- agents + prompts (one view) -------- */
+let openEditorPath = null;  // survives refresh: reopen the same editor
+
 async function loadAgents() {
-  let agents;
-  try { agents = await api("/api/agents"); }
-  catch (e) { $("#agents").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; return; }
+  let agents, promptFiles;
+  try {
+    [agents, promptFiles] = await Promise.all([api("/api/agents"), api("/api/prompts")]);
+  } catch (e) {
+    $("#agents").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+    return;
+  }
+  if (openEditorPath && $("#agents").querySelector("tr.editor textarea")?.dataset.dirty === "1") {
+    return;  // never clobber unsaved edits on auto-refresh
+  }
 
   const running = agents.filter(a => a.running).length;
   $("#summary").textContent = `${running} running / ${agents.length} agents`;
-  if (!agents.length) {
+  if (!agents.length && !promptFiles.length) {
     $("#agents").innerHTML = `<div class="empty">No LaunchAgents matched. Adjust launchagent_patterns in ~/.config/agent-monitor/config.json</div>`;
     return;
+  }
+
+  // Bucket prompts: linked to an agent label, else to a group, else loose
+  const byLabel = {}, byGroup = {}, loose = [];
+  const labels = new Set(agents.map(a => a.label));
+  const groupNames = new Set(agents.map(a => a.group).filter(Boolean));
+  for (const f of promptFiles) {
+    if (f.agent_label && labels.has(f.agent_label)) {
+      (byLabel[f.agent_label] = byLabel[f.agent_label] || []).push(f);
+    } else if (f.group && groupNames.has(f.group)) {
+      (byGroup[f.group] = byGroup[f.group] || []).push(f);
+    } else {
+      loose.push(f);
+    }
   }
 
   const groups = {};
@@ -238,30 +272,56 @@ async function loadAgents() {
   let html = "";
   for (const key of keys) {
     if (key) html += `<div class="grouphead">${esc(key)}</div>`;
-    html += `<table><tr><th style="width:34%">Agent</th><th>Status</th><th>Schedule</th><th style="text-align:right">Actions</th></tr>`;
+    html += `<table><tr><th style="width:26%">Agent</th><th style="width:12%">Status</th><th style="width:13%">Schedule</th><th>Prompt</th><th style="text-align:right;width:22%">Actions</th></tr>`;
     for (const a of groups[key]) {
-      const dot = a.running ? "on" : a.error ? "err" : "off";
-      const status = a.running ? `PID ${esc(a.pid)}`
-        : a.error ? `exit ${esc(a.exit_code)}`
-        : a.loaded ? "loaded" : "not loaded";
-      html += `<tr>
-        <td><span class="dot ${dot}"></span>${esc(a.name)}<div class="sub">${esc(a.label)}</div></td>
-        <td>${status}${a.keep_alive ? '<div class="sub">keepalive</div>' : ""}</td>
-        <td>${esc(a.schedule)}</td>
-        <td class="actions">
-          ${a.stdout_log ? `<button class="act" data-log="${esc(a.label)}" data-which="stdout">log</button>` : ""}
-          ${a.stderr_log ? `<button class="act" data-log="${esc(a.label)}" data-which="stderr">err</button>` : ""}
-          ${a.running
-            ? `<button class="act" data-do="restart" data-label="${esc(a.label)}">restart</button>
-               <button class="act" data-do="stop" data-label="${esc(a.label)}">stop</button>`
-            : `<button class="act primary" data-do="start" data-label="${esc(a.label)}">start</button>`}
-        </td></tr>`;
+      html += agentRow(a, byLabel[a.label] || []);
+    }
+    // Group-level prompt files not tied to one schedule entry
+    const extras = key ? (byGroup[key] || []) : [];
+    if (extras.length) {
+      html += `<tr class="rowhover"><td class="muted">shared prompts</td><td></td><td></td><td colspan="2">${extras.map(chip).join("")}</td></tr>`;
     }
     html += `</table>`;
   }
+  if (loose.length) {
+    html += `<div class="grouphead">other prompts</div><table>`;
+    html += `<tr class="rowhover"><td>${loose.map(chip).join("")}</td></tr></table>`;
+  }
   $("#agents").innerHTML = html;
+  wireAgents();
+  if (openEditorPath) {
+    const c = $("#agents").querySelector(`.chip[data-edit="${CSS.escape(openEditorPath)}"]`);
+    if (c) c.click(); else openEditorPath = null;
+  }
+}
 
-  $("#agents").querySelectorAll("[data-do]").forEach(btn => btn.addEventListener("click", async () => {
+function agentRow(a, prompts) {
+  const dot = a.running ? "on" : a.error ? "err" : "off";
+  const status = a.running ? `PID ${esc(a.pid)}`
+    : a.error ? `exit ${esc(a.exit_code)}`
+    : a.loaded ? "loaded" : "not loaded";
+  return `<tr class="rowhover">
+    <td><span class="dot ${dot}"></span>${esc(a.name)}<div class="sub">${esc(a.label)}</div></td>
+    <td>${status}${a.keep_alive ? '<div class="sub">keepalive</div>' : ""}</td>
+    <td>${esc(a.schedule)}</td>
+    <td>${prompts.length ? prompts.map(chip).join("") : '<span class="muted">none</span>'}</td>
+    <td class="actions">
+      ${a.stdout_log ? `<button class="act" data-log="${esc(a.label)}" data-which="stdout">log</button>` : ""}
+      ${a.stderr_log ? `<button class="act" data-log="${esc(a.label)}" data-which="stderr">err</button>` : ""}
+      ${a.running
+        ? `<button class="act" data-do="restart" data-label="${esc(a.label)}">restart</button>
+           <button class="act" data-do="stop" data-label="${esc(a.label)}">stop</button>`
+        : `<button class="act primary" data-do="start" data-label="${esc(a.label)}">start</button>`}
+    </td></tr>`;
+}
+
+function chip(f) {
+  return `<span class="chip" data-edit="${esc(f.path)}" title="${esc(f.path)}">${esc(f.name)}</span>`;
+}
+
+function wireAgents() {
+  const root = $("#agents");
+  root.querySelectorAll("[data-do]").forEach(btn => btn.addEventListener("click", async () => {
     btn.disabled = true;
     try {
       await api(`/api/agents/${encodeURIComponent(btn.dataset.label)}/${btn.dataset.do}`, {method: "POST"});
@@ -269,12 +329,68 @@ async function loadAgents() {
     } catch (e) { toast("Error: " + e.message); }
     setTimeout(loadAgents, 600);
   }));
-  $("#agents").querySelectorAll("[data-log]").forEach(btn => btn.addEventListener("click", async () => {
+  root.querySelectorAll("[data-log]").forEach(btn => btn.addEventListener("click", async () => {
     try {
       const d = await api(`/api/agents/${encodeURIComponent(btn.dataset.log)}/log?which=${btn.dataset.which}&lines=300`);
-      openDrawer(d.path, { text: d.content || "(empty)" });
+      openDrawer(d.path, d.content || "(empty)");
     } catch (e) { toast("Error: " + e.message); }
   }));
+  root.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => toggleEditor(c)));
+}
+
+async function toggleEditor(chipEl) {
+  const path = chipEl.dataset.edit;
+  const existing = $("#agents").querySelector("tr.editor");
+  const wasOpen = chipEl.classList.contains("open");
+  if (existing) {
+    const ta = existing.querySelector("textarea");
+    if (ta?.dataset.dirty === "1" && !confirm("Discard unsaved changes?")) return;
+    existing.remove();
+    $("#agents").querySelectorAll(".chip.open").forEach(c => c.classList.remove("open"));
+    openEditorPath = null;
+    if (wasOpen) return;
+  }
+  let d;
+  try { d = await api(`/api/prompts/file?path=${encodeURIComponent(path)}`); }
+  catch (e) { toast("Error: " + e.message); return; }
+
+  chipEl.classList.add("open");
+  openEditorPath = path;
+  const hostRow = chipEl.closest("tr");
+  const cols = hostRow.children.length === 1 ? 1 : 5;
+  const tr = document.createElement("tr");
+  tr.className = "editor";
+  tr.innerHTML = `<td colspan="${cols}"><div class="editorbox">
+    <div class="ebar">
+      <span class="path">${esc(path)}</span>
+      <span class="spacer"></span>
+      <button class="act primary" data-save>Save</button>
+      <button class="act" data-cancel>Close</button>
+    </div>
+    <textarea spellcheck="false"></textarea>
+  </div></td>`;
+  hostRow.after(tr);
+  const ta = tr.querySelector("textarea");
+  ta.value = d.content;
+  ta.style.height = Math.min(500, Math.max(240, d.content.split("\n").length * 19 + 40)) + "px";
+  ta.addEventListener("input", () => ta.dataset.dirty = "1");
+  tr.querySelector("[data-save]").addEventListener("click", async () => {
+    try {
+      await api("/api/prompts/file", {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ path, content: ta.value }),
+      });
+      ta.dataset.dirty = "0";
+      toast("Saved " + path);
+    } catch (e) { toast("Save failed: " + e.message, 4000); }
+  });
+  tr.querySelector("[data-cancel]").addEventListener("click", () => {
+    if (ta.dataset.dirty === "1" && !confirm("Discard unsaved changes?")) return;
+    tr.remove();
+    chipEl.classList.remove("open");
+    openEditorPath = null;
+  });
 }
 
 /* -------- sessions -------- */
@@ -295,7 +411,7 @@ async function loadSessions() {
   let html = `<table><tr><th style="width:6%">Age</th><th style="width:18%">Project</th><th>Last prompt / summary</th><th style="width:8%">Branch</th><th style="text-align:right;width:16%">Actions</th></tr>`;
   for (const s of list) {
     const proj = s.cwd ? s.cwd.split("/").filter(Boolean).pop() : s.project;
-    html += `<tr>
+    html += `<tr class="rowhover">
       <td>${ageStr(s.mtime)}</td>
       <td>${esc(proj)}<div class="sub">${esc(s.cwd || "")}</div></td>
       <td>${esc(s.title)}<div class="sub">${esc(s.id)}</div></td>
@@ -324,48 +440,7 @@ async function loadSessions() {
   }));
 }
 
-/* -------- prompts -------- */
-async function loadPrompts() {
-  let files;
-  try { files = await api("/api/prompts"); }
-  catch (e) { $("#prompts").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; return; }
-  if (!files.length) {
-    $("#prompts").innerHTML = `<div class="empty">No prompt files found. Add prompt_dirs to ~/.config/agent-monitor/config.json</div>`;
-    return;
-  }
-  let html = `<table><tr><th>File</th><th>Source</th><th style="width:8%">Size</th><th style="text-align:right;width:10%"></th></tr>`;
-  for (const f of files) {
-    html += `<tr>
-      <td>${esc(f.name)}<div class="sub">${esc(f.path)}</div></td>
-      <td>${f.agent_label ? esc(f.agent_label) : '<span class="muted">prompt dir</span>'}</td>
-      <td>${(f.size / 1024).toFixed(1)}k</td>
-      <td class="actions"><button class="act primary" data-edit="${esc(f.path)}">edit</button></td></tr>`;
-  }
-  html += `</table>`;
-  $("#prompts").innerHTML = html;
-
-  $("#prompts").querySelectorAll("[data-edit]").forEach(btn => btn.addEventListener("click", async () => {
-    const path = btn.dataset.edit;
-    try {
-      const d = await api(`/api/prompts/file?path=${encodeURIComponent(path)}`);
-      openDrawer(path, { text: d.content, editable: true });
-      drawerSaveHandler = async () => {
-        try {
-          await api("/api/prompts/file", {
-            method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ path, content: $("#drawer-edit").value }),
-          });
-          toast("Saved " + path);
-          $("#drawer").classList.remove("open");
-          loadPrompts();
-        } catch (e) { toast("Save failed: " + e.message, 4000); }
-      };
-    } catch (e) { toast("Error: " + e.message); }
-  }));
-}
-
-loadAgents(); loadSessions(); loadPrompts();
+loadAgents(); loadSessions();
 setInterval(loadAgents, 15000);
 setInterval(loadSessions, 30000);
 </script>

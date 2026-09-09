@@ -33,7 +33,11 @@ def discover(prompt_dirs, agents):
                     continue
                 real = os.path.realpath(os.path.join(dirpath, name))
                 if real not in seen:
-                    seen[real] = _entry(real, "prompt_dir", None)
+                    # First subdirectory under the prompt dir names the
+                    # agent group, e.g. prompts/susie/brief.md -> susie
+                    rel = os.path.relpath(real, os.path.realpath(root))
+                    group = rel.split(os.sep)[0] if os.sep in rel else None
+                    seen[real] = _entry(real, "prompt_dir", None, group)
                 if len(seen) >= MAX_FILES:
                     break
 
@@ -41,7 +45,7 @@ def discover(prompt_dirs, agents):
     return entries
 
 
-def _entry(path, source, agent_label):
+def _entry(path, source, agent_label, group=None):
     try:
         stat = os.stat(path)
         size, mtime = stat.st_size, stat.st_mtime
@@ -52,6 +56,7 @@ def _entry(path, source, agent_label):
         "name": os.path.basename(path),
         "source": source,
         "agent_label": agent_label,
+        "group": group,
         "size": size,
         "mtime": mtime,
     }
