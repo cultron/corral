@@ -78,9 +78,14 @@ def load_config():
         pass
     except Exception as e:
         print(f"corral: bad config at {CONFIG_PATH}: {e}")
-    # User engines extend the built-ins instead of replacing the table
-    engines = dict(DEFAULTS["engines"])
-    engines.update(cfg.get("engines") or {})
+    # User engines extend the built-ins, and a user entry for a built-in
+    # engine overrides only the fields it sets, so config files written by
+    # older versions still pick up new defaults such as "list_models".
+    engines = {name: dict(spec) for name, spec in DEFAULTS["engines"].items()}
+    for name, spec in (cfg.get("engines") or {}).items():
+        merged = dict(engines.get(name, {}))
+        merged.update(spec or {})
+        engines[name] = merged
     cfg["engines"] = engines
     # Registered agents are always visible and their prompts editable,
     # regardless of the user's pattern list.

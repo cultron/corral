@@ -395,7 +395,7 @@ async function loadAgents() {
   const running = agents.filter(a => a.running).length;
   $("#summary").textContent = `${running} running / ${agents.length} agents`;
   if (!agents.length && !promptFiles.length) {
-    $("#agents-list").innerHTML = `<div class="empty">No LaunchAgents matched. Adjust launchagent_patterns in ~/.config/corral/config.json</div>`;
+    $("#agents-list").innerHTML = `<div class="empty">No agents yet. Click + Add Agent to register one, or add launchagent_patterns in ~/.config/corral/config.json to watch other launchd jobs.</div>`;
     return;
   }
 
