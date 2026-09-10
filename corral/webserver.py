@@ -85,6 +85,9 @@ def make_handler(cfg):
             # /api/sessions/<id>/resume
             if len(parts) == 4 and parts[:2] == ["api", "sessions"] and parts[3] == "resume":
                 return self._api_session_resume(parts[2])
+            # /api/registry  (create agent)
+            if len(parts) == 2 and parts == ["api", "registry"]:
+                return self._api_registry_create()
             # /api/registry/<name>  (update engine/model)
             if len(parts) == 3 and parts[:2] == ["api", "registry"]:
                 return self._api_registry_update(parts[2])
@@ -143,6 +146,54 @@ def make_handler(cfg):
                         entry["is_service"] = registry.is_service(rcfg)
                 out.append(entry)
             self._send_json(out)
+
+        def _api_registry_create(self):
+            body = self._read_body()
+            name = (body.get("name") or "").strip()
+            engine = body.get("engine") or None
+            if engine and engine not in cfg["engines"]:
+                return self._send_error_json(f"unknown engine {engine!r}", 400)
+
+            schedule = None
+            interval = None
+            keep_alive = False
+            sched = body.get("schedule") or {}
+            stype = sched.get("type", "manual")
+            if stype in ("daily", "weekly"):
+                try:
+                    hour, minute = (sched.get("at") or "").split(":")
+                    schedule = {"Hour": int(hour), "Minute": int(minute)}
+                except ValueError:
+                    return self._send_error_json("schedule time must be HH:MM", 400)
+                if stype == "weekly":
+                    day = sched.get("weekday")
+                    if day is None:
+                        return self._send_error_json("weekly schedule needs a weekday", 400)
+                    schedule["Weekday"] = int(day)
+            elif stype == "interval":
+                try:
+                    interval = max(1, int(sched.get("every")))
+                except (TypeError, ValueError):
+                    return self._send_error_json("interval needs seconds", 400)
+            elif stype == "keepalive":
+                keep_alive = True
+
+            try:
+                meta = registry.add(
+                    name,
+                    prompt_text=body.get("prompt") or "",
+                    engine=engine,
+                    model=body.get("model") or None,
+                    schedule=schedule,
+                    interval_seconds=interval,
+                    keep_alive=keep_alive,
+                    workdir=(body.get("workdir") or "").strip() or None,
+                    description=body.get("description") or "",
+                )
+                registry.sync(quiet=True)
+            except registry.RegistryError as e:
+                return self._send_error_json(str(e), 400)
+            self._send_json({"ok": True, "name": name, "label": meta["label"]})
 
         def _api_registry_update(self, name):
             body = self._read_body()

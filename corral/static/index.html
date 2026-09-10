@@ -180,7 +180,46 @@ tr.editor td { background: var(--bg-inset); padding: 0; }
   <button data-pane="sessions">Sessions</button>
 </nav>
 <main>
-  <section id="agents" class="pane active"><div class="empty">Loading agents...</div></section>
+  <section id="agents" class="pane active">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:4px">
+      <button class="act primary" id="add-agent-btn">+ Add Agent</button>
+    </div>
+    <div id="add-agent-form" style="display:none">
+      <div class="editorbox" style="margin-bottom:20px; background:var(--bg-inset)">
+        <div class="ebar"><span class="path">New agent</span></div>
+        <div class="engineform">
+          <label>Name</label><input data-f="name" placeholder="my-agent" style="width:170px">
+          <label>Schedule</label>
+          <select data-f="stype">
+            <option value="manual">manual</option>
+            <option value="daily">daily at</option>
+            <option value="weekly">weekly at</option>
+            <option value="interval">every N seconds</option>
+            <option value="keepalive">keep-alive</option>
+          </select>
+          <input data-f="at" placeholder="HH:MM" style="width:80px; display:none">
+          <select data-f="weekday" style="display:none">
+            <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option>
+            <option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option>
+            <option value="0">Sun</option>
+          </select>
+          <input data-f="every" placeholder="seconds" style="width:100px; display:none">
+        </div>
+        <div class="engineform">
+          <label>Engine</label><select data-f="engine"></select>
+          <label>Model</label><input data-f="model" placeholder="engine default" style="width:220px">
+          <label>Workdir</label><input data-f="workdir" placeholder="optional" style="width:220px">
+        </div>
+        <textarea data-f="prompt" spellcheck="false" placeholder="Prompt for this agent..." style="min-height:150px"></textarea>
+        <div class="engineform">
+          <button class="act primary" id="add-agent-create">Create Agent</button>
+          <button class="act" id="add-agent-cancel">Cancel</button>
+          <span class="muted" style="font-size:11px">registers the agent, installs its launchd job, and starts it on schedule</span>
+        </div>
+      </div>
+    </div>
+    <div id="agents-list"><div class="empty">Loading agents...</div></div>
+  </section>
   <section id="sessions" class="pane"><div class="empty">Loading sessions...</div></section>
 </main>
 
@@ -242,14 +281,63 @@ $("#drawer-close").addEventListener("click", () => $("#drawer").classList.remove
 /* -------- agents + prompts (one view) -------- */
 let openEditorPath = null;  // survives refresh: reopen the same editor
 let ENGINES = ["claude"];
-api("/api/engines").then(e => ENGINES = e).catch(() => {});
+api("/api/engines").then(e => {
+  ENGINES = e;
+  const sel = $('#add-agent-form [data-f="engine"]');
+  sel.innerHTML = e.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+}).catch(() => {});
+
+/* -------- add agent form -------- */
+const addForm = $("#add-agent-form");
+const af = f => addForm.querySelector(`[data-f="${f}"]`);
+$("#add-agent-btn").addEventListener("click", () => {
+  addForm.style.display = addForm.style.display === "none" ? "block" : "none";
+  if (addForm.style.display === "block") af("name").focus();
+});
+$("#add-agent-cancel").addEventListener("click", () => addForm.style.display = "none");
+af("stype").addEventListener("change", () => {
+  const t = af("stype").value;
+  af("at").style.display = (t === "daily" || t === "weekly") ? "" : "none";
+  af("weekday").style.display = t === "weekly" ? "" : "none";
+  af("every").style.display = t === "interval" ? "" : "none";
+});
+$("#add-agent-create").addEventListener("click", async () => {
+  const body = {
+    name: af("name").value.trim(),
+    engine: af("engine").value,
+    model: af("model").value.trim(),
+    workdir: af("workdir").value.trim(),
+    prompt: af("prompt").value,
+    schedule: {
+      type: af("stype").value,
+      at: af("at").value.trim(),
+      weekday: af("weekday").value,
+      every: af("every").value.trim(),
+    },
+  };
+  if (!body.name) { toast("Agent needs a name"); return; }
+  const btn = $("#add-agent-create");
+  btn.disabled = true;
+  try {
+    const d = await api("/api/registry", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+    toast(`Created ${d.label}`);
+    addForm.style.display = "none";
+    ["name", "model", "workdir", "prompt", "at", "every"].forEach(f => af(f).value = "");
+    loadAgents();
+  } catch (e) { toast("Error: " + e.message, 4000); }
+  btn.disabled = false;
+});
 
 async function loadAgents() {
   let agents, promptFiles;
   try {
     [agents, promptFiles] = await Promise.all([api("/api/agents"), api("/api/prompts")]);
   } catch (e) {
-    $("#agents").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+    $("#agents-list").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
     return;
   }
   if (openEditorPath && $("#agents").querySelector("tr.editor textarea")?.dataset.dirty === "1") {
@@ -262,7 +350,7 @@ async function loadAgents() {
   const running = agents.filter(a => a.running).length;
   $("#summary").textContent = `${running} running / ${agents.length} agents`;
   if (!agents.length && !promptFiles.length) {
-    $("#agents").innerHTML = `<div class="empty">No LaunchAgents matched. Adjust launchagent_patterns in ~/.config/corral/config.json</div>`;
+    $("#agents-list").innerHTML = `<div class="empty">No LaunchAgents matched. Adjust launchagent_patterns in ~/.config/corral/config.json</div>`;
     return;
   }
 
@@ -302,7 +390,7 @@ async function loadAgents() {
     html += `<div class="grouphead">other prompts</div><table>`;
     html += `<tr class="rowhover"><td>${loose.map(chip).join("")}</td></tr></table>`;
   }
-  $("#agents").innerHTML = html;
+  $("#agents-list").innerHTML = html;
   wireAgents();
   if (openEditorPath) {
     const c = $("#agents").querySelector(`.chip[data-edit="${CSS.escape(openEditorPath)}"]`);
