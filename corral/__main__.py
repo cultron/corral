@@ -45,6 +45,9 @@ def main():
                        help="run continuously; restart on exit")
     add_p.add_argument("--workdir", help="working directory for runs")
     add_p.add_argument("--env", action="append", default=[], metavar="K=V")
+    add_p.add_argument("--extra", metavar="JSON",
+                       help="extra launchd keys merged into the plist, "
+                       "e.g. '{\"WatchPaths\": [\"/some/file\"]}'")
     add_p.add_argument("--description", default="")
     add_p.add_argument("--no-sync", action="store_true",
                        help="register only; do not install the launchd plist yet")
@@ -115,6 +118,14 @@ def agent_add(args):
         k, v = pair.split("=", 1)
         env[k] = v
 
+    extra = None
+    if args.extra:
+        try:
+            extra = json.loads(args.extra)
+        except ValueError as e:
+            print(f"corral: --extra is not valid JSON: {e}", file=sys.stderr)
+            return 1
+
     meta = registry.add(
         args.name,
         prompt_text=prompt_text,
@@ -125,6 +136,7 @@ def agent_add(args):
         workdir=args.workdir,
         env=env,
         description=args.description,
+        launchd_extra=extra,
     )
     print(f"registered {args.name} at {meta['dir']}")
     if args.no_sync:

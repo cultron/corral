@@ -59,8 +59,20 @@ corral agent remove <name> --purge  # also deletes the folder and logs
 
 Ask before using `--purge`; it deletes the prompt and run history.
 
+## Daemons and advanced launchd options
+
+Agents can be long-running services. `--keep-alive` agents are exec'd directly so launchd supervises the real process. For launchd keys the CLI does not model, pass raw JSON with `--extra`, merged into the generated plist verbatim:
+
+```bash
+corral agent add inbox-alert --command "bash ~/scripts/notify.sh" \
+  --extra '{"WatchPaths": ["/Users/me/inbox/ALERT.md"], "ThrottleInterval": 60}'
+corral agent add api-server --command "node ~/api/server.js" \
+  --extra '{"KeepAlive": {"SuccessfulExit": false}, "RunAtLoad": true}'
+```
+
 ## Notes
 
 - Schedules use launchd. `--at HH:MM` runs daily, `--weekday` restricts it, `--every SECONDS` uses a fixed interval, `--keep-alive` restarts the process whenever it exits.
 - The default command runs Claude Code headless (`claude -p`). Any CLI works: set `--command` to use a different tool, with `{prompt}` or `{prompt_file}` for the prompt.
 - A `manual` agent (no schedule flags) only runs via `corral run <name>`.
+- `corral agent sync` only reloads agents whose plist changed; running daemons are not bounced by unrelated adds.

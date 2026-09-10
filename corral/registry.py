@@ -80,7 +80,7 @@ def load(name):
 
 def add(name, prompt_text=None, command=None, schedule=None,
         interval_seconds=None, keep_alive=False, workdir=None, env=None,
-        description=""):
+        description="", launchd_extra=None):
     """Create the agent folder. Fails if the agent already exists."""
     validate_name(name)
     d = agent_dir(name)
@@ -95,6 +95,9 @@ def add(name, prompt_text=None, command=None, schedule=None,
         "keep_alive": bool(keep_alive),
         "workdir": workdir,
         "env": env or {},
+        # Extra launchd keys merged into the generated plist verbatim,
+        # e.g. WatchPaths, ThrottleInterval, or a KeepAlive dict.
+        "launchd_extra": launchd_extra or {},
     }
     with open(os.path.join(d, "agent.json"), "w") as f:
         json.dump(cfg, f, indent=2)
@@ -154,11 +157,34 @@ def sync(python_exec=None, quiet=False):
             plist["StartInterval"] = int(cfg["interval_seconds"])
         if cfg.get("env"):
             plist["EnvironmentVariables"] = {k: str(v) for k, v in cfg["env"].items()}
+        plist.update(cfg.get("launchd_extra") or {})
 
+        # Skip reload when nothing changed, so syncing after adding one
+        # agent does not bounce every running daemon.
         pp = meta["plist_path"]
+        new_bytes = plistlib.dumps(plist)
+        try:
+            with open(pp, "rb") as f:
+                unchanged = f.read() == new_bytes
+        except OSError:
+            unchanged = False
+        if unchanged and _is_loaded(meta["label"]):
+            say(f"unchanged {meta['label']}")
+            continue
+
         subprocess.run(["launchctl", "unload", pp], capture_output=True, timeout=10)
         with open(pp, "wb") as f:
-            plistlib.dump(plist, f)
+            f.write(new_bytes)
         subprocess.run(["launchctl", "load", pp], capture_output=True, timeout=10)
         say(f"synced {meta['label']}")
     return len(registered)
+
+
+def _is_loaded(label):
+    try:
+        result = subprocess.run(
+            ["launchctl", "list", label], capture_output=True, timeout=5
+        )
+        return result.returncode == 0
+    except Exception:
+        return False

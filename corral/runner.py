@@ -30,6 +30,14 @@ def run(name):
     env = dict(os.environ)
     env.update({k: str(v) for k, v in (cfg.get("env") or {}).items()})
 
+    # Services (keep-alive, or anything with a KeepAlive override) replace
+    # this process entirely, so launchd signals the daemon itself and
+    # stop/restart cannot orphan a child. Output goes to the launchd logs.
+    is_service = cfg.get("keep_alive") or "KeepAlive" in (cfg.get("launchd_extra") or {})
+    if is_service:
+        os.chdir(workdir)
+        os.execvpe(argv[0], argv, env)
+
     logs_dir = os.path.join(meta["dir"], "logs")
     os.makedirs(logs_dir, exist_ok=True)
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")

@@ -90,6 +90,22 @@ corral agent remove <name> --purge   # delete the folder too
 corral agent sync             # regenerate plists after editing agent.json
 ```
 
+`sync` only reloads agents whose generated plist changed, so adding one agent never restarts the others.
+
+## Daemons and advanced launchd options
+
+Corral agents can be long-running services, not just scheduled runs. `--keep-alive` agents are exec'd directly, so launchd supervises the real process and stop/restart signals reach it. For launchd keys the CLI does not model, pass raw JSON with `--extra` (or set `launchd_extra` in `agent.json`); it is merged into the generated plist verbatim:
+
+```bash
+# a watcher triggered when a file changes
+corral agent add inbox-alert --command "bash ~/scripts/notify.sh" \
+  --extra '{"WatchPaths": ["~/inbox/NEEDS-ATTENTION.md"], "ThrottleInterval": 60}'
+
+# a server restarted only on crash, not on clean exit
+corral agent add api-server --command "node ~/api/server.js" \
+  --extra '{"KeepAlive": {"SuccessfulExit": false}, "RunAtLoad": true}'
+```
+
 ## Claude Code plugin
 
 The repo doubles as a Claude Code plugin marketplace. Install it and Claude can register agents for you from a conversation ("add an agent that summarizes my inbox every morning at 8"):
