@@ -45,28 +45,31 @@ def draw(scale):
         p.lineToPoint_((x2, Y(y2)))
         stroke(p, width)
 
-    import math
-
-    def arc(cx, cy, rx, ry, t0, t1, width, steps=48):
-        """Elliptical arc; angles in degrees, y-down design coords (90 = bottom)."""
+    def poly(points, width, closed=True):
         p = AppKit.NSBezierPath.bezierPath()
-        for i in range(steps + 1):
-            t = math.radians(t0 + (t1 - t0) * i / steps)
-            pt = (cx + rx * math.cos(t), Y(cy + ry * math.sin(t)))
-            p.moveToPoint_(pt) if i == 0 else p.lineToPoint_(pt)
+        p.moveToPoint_((points[0][0], Y(points[0][1])))
+        for x, y in points[1:]:
+            p.lineToPoint_((x, Y(y)))
+        if closed:
+            p.closePath()
         stroke(p, width)
 
-    # An oval corral seen from slightly above: a thin far rail, two
-    # heavier near rails, and posts along the near side.
-    cx, rx, ry = 9.0, 7.4, 3.4
-    top_rail, bot_rail = 7.4, 10.6      # ellipse centers (y) of the two rails
-    arc(cx, top_rail, rx, ry, 180, 360, 1.2)             # far side of the upper rail
-    arc(cx, top_rail, rx, ry, 0, 180, 1.7)               # near side, upper rail
-    arc(cx, bot_rail, rx, ry, 0, 180, 1.7)               # near side, lower rail
-    for deg in (150, 90, 30):                            # posts on the near side
-        x = cx + rx * math.cos(math.radians(deg))
-        dy = ry * math.sin(math.radians(deg))
-        line(x, top_rail + dy - 1.9, x, bot_rail + dy + 1.9, 2.0)
+    # A square pen seen from above at an angle (isometric): four corner
+    # posts joined by two rails per side. The rails form two stacked
+    # diamonds; the posts poke above and below them.
+    cx, cy = 9.0, 6.4        # centre of the upper rail diamond
+    hw, hh = 7.4, 2.6        # diamond half-width / half-height
+    drop = 5.2               # vertical gap between the two rails (>= 2*hh so they never cross)
+    post_w, rail_w = 2.1, 1.3
+    overhang = 1.4
+
+    def diamond(y):
+        return [(cx, y - hh), (cx + hw, y), (cx, y + hh), (cx - hw, y)]
+
+    poly(diamond(cy), rail_w)
+    poly(diamond(cy + drop), rail_w)
+    for x, y in diamond(cy):
+        line(x, y - overhang, x, y + drop + overhang, post_w)
 
     AppKit.NSGraphicsContext.restoreGraphicsState()
     return rep
