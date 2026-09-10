@@ -124,11 +124,9 @@ class CorralApp(rumps.App):
         return item, is_running
 
     def _sessions_menu(self):
-        menu = rumps.MenuItem("Claude Sessions")
+        menu = rumps.MenuItem("Sessions")
         try:
-            recent = sessions.list_sessions(
-                self.cfg["claude_projects_dir"], limit=self.cfg["menu_sessions"]
-            )
+            recent = sessions.list_sessions(self.cfg, limit=self.cfg["menu_sessions"])
         except Exception:
             recent = []
         if not recent:
@@ -140,7 +138,8 @@ class CorralApp(rumps.App):
             age = sessions.age_str(s["mtime"])
             project = sessions.short_project(s["project"], s["cwd"])
             title = s["title"] if len(s["title"]) <= 60 else s["title"][:57] + "..."
-            item = rumps.MenuItem(f"{age} · {project} · {title}")
+            engine = s.get("engine", "claude")
+            item = rumps.MenuItem(f"{age} · {engine} · {project} · {title}")
             item.add(rumps.MenuItem(f"  {s['id']}", callback=None))
             if s["cwd"]:
                 item.add(rumps.MenuItem(f"  {s['cwd']}", callback=None))
@@ -178,7 +177,7 @@ class CorralApp(rumps.App):
 
     def _resume_cb(self, session):
         def callback(_):
-            cmd = terminal.resume_command(session["cwd"], session["id"])
+            cmd = terminal.resume_command(session["cwd"], session["id"], session.get("engine", "claude"))
             ok, err = terminal.open_in_terminal(cmd, self.cfg["terminal"])
             if not ok:
                 rumps.notification("Corral", "Resume failed", err, sound=False)
@@ -186,7 +185,7 @@ class CorralApp(rumps.App):
 
     def _copy_cb(self, session):
         def callback(_):
-            cmd = terminal.resume_command(session["cwd"], session["id"])
+            cmd = terminal.resume_command(session["cwd"], session["id"], session.get("engine", "claude"))
             terminal.copy_to_clipboard(cmd)
             rumps.notification("Corral", "Copied", cmd, sound=False)
         return callback

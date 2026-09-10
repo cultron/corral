@@ -10,7 +10,7 @@ import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import launchagents, prompts, registry, sessions, terminal
+from . import engines, launchagents, prompts, registry, sessions, terminal
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
@@ -61,11 +61,11 @@ def make_handler(cfg):
             if path == "/api/agents":
                 return self._api_agents()
             if path == "/api/engines":
-                return self._send_json(sorted(cfg["engines"]))
+                return self._send_json(engines.describe(cfg))
             if path == "/api/sessions":
                 limit = int(query.get("limit", ["50"])[0])
                 return self._send_json(
-                    sessions.list_sessions(cfg["claude_projects_dir"], limit=min(limit, 200))
+                    sessions.list_sessions(cfg, limit=min(limit, 200))
                 )
             if path == "/api/prompts":
                 return self._send_json(prompts.discover(cfg["prompt_dirs"], self._agents()))
@@ -245,9 +245,9 @@ def make_handler(cfg):
             self._send_json({"path": log_path, "content": content})
 
         def _api_session_resume(self, session_id):
-            for s in sessions.list_sessions(cfg["claude_projects_dir"], limit=200):
+            for s in sessions.list_sessions(cfg, limit=200):
                 if s["id"] == session_id:
-                    cmd = terminal.resume_command(s["cwd"], session_id)
+                    cmd = terminal.resume_command(s["cwd"], session_id, s.get("engine", "claude"))
                     ok, err = terminal.open_in_terminal(cmd, cfg["terminal"])
                     if ok:
                         return self._send_json({"ok": True, "command": cmd})

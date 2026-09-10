@@ -207,7 +207,7 @@ tr.editor td { background: var(--bg-inset); padding: 0; }
         </div>
         <div class="engineform">
           <label>Engine</label><select data-f="engine"></select>
-          <label>Model</label><input data-f="model" placeholder="engine default" style="width:220px">
+          <label>Model</label><span class="modelpick"><select data-f="model-select"></select><input data-f="model" placeholder="model name" style="width:200px;display:none"><span class="muted" data-model-note style="display:none;font-size:11px">set in engine config</span></span>
           <label>Workdir</label><input data-f="workdir" placeholder="optional" style="width:220px">
         </div>
         <textarea data-f="prompt" spellcheck="false" placeholder="Prompt for this agent..." style="min-height:150px"></textarea>
@@ -280,11 +280,55 @@ $("#drawer-close").addEventListener("click", () => $("#drawer").classList.remove
 
 /* -------- agents + prompts (one view) -------- */
 let openEditorPath = null;  // survives refresh: reopen the same editor
-let ENGINES = ["claude"];
+/* -------- engines & models --------
+   /api/engines: [{name, available, path, takes_model, models}] */
+let ENGINES = [{name: "claude", available: true, takes_model: true, models: []}];
+const RESUME_CMD = {claude: id => `claude --resume ${id}`, codex: id => `codex resume ${id}`};
+function engineInfo(name) {
+  return ENGINES.find(e => e.name === name) || {name, available: true, takes_model: true, models: []};
+}
+function engineOptions(selected) {
+  return ENGINES.map(e => `<option value="${esc(e.name)}" ${e.name === selected ? "selected" : ""} ${e.available ? "" : "disabled"}>${esc(e.name)}${e.available ? "" : " (not installed)"}</option>`).join("");
+}
+function firstAvailableEngine() {
+  const e = ENGINES.find(e => e.available) || ENGINES[0];
+  return e ? e.name : "claude";
+}
+/* Fill a model picker: a <select> of known models plus a "custom" text input.
+   Engines with no model flag (e.g. dsh) show a note instead. */
+function fillModelPicker(sel, input, note, engineName, current) {
+  const info = engineInfo(engineName);
+  current = current || "";
+  if (!info.takes_model) {
+    sel.style.display = "none"; input.style.display = "none"; input.value = "";
+    if (note) note.style.display = "";
+    return;
+  }
+  if (note) note.style.display = "none";
+  const models = info.models || [];
+  const custom = current && !models.includes(current);
+  sel.innerHTML = [`<option value="">engine default</option>`]
+    .concat(models.map(m => `<option value="${esc(m)}" ${m === current ? "selected" : ""}>${esc(m)}</option>`))
+    .concat([`<option value="__custom__" ${custom ? "selected" : ""}>custom...</option>`]).join("");
+  sel.style.display = "";
+  input.style.display = custom ? "" : "none";
+  input.value = custom ? current : "";
+  sel.onchange = () => {
+    const isCustom = sel.value === "__custom__";
+    input.style.display = isCustom ? "" : "none";
+    if (isCustom) input.focus(); else input.value = "";
+  };
+}
+function pickedModel(sel, input) {
+  if (sel.style.display === "none") return "";
+  return sel.value === "__custom__" ? input.value.trim() : sel.value;
+}
 api("/api/engines").then(e => {
   ENGINES = e;
   const sel = $('#add-agent-form [data-f="engine"]');
-  sel.innerHTML = e.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  sel.innerHTML = engineOptions(firstAvailableEngine());
+  sel.onchange = () => fillModelPicker(af("model-select"), af("model"), addForm.querySelector("[data-model-note]"), sel.value, "");
+  sel.onchange();
 }).catch(() => {});
 
 /* -------- add agent form -------- */
@@ -305,7 +349,7 @@ $("#add-agent-create").addEventListener("click", async () => {
   const body = {
     name: af("name").value.trim(),
     engine: af("engine").value,
-    model: af("model").value.trim(),
+    model: pickedModel(af("model-select"), af("model")),
     workdir: af("workdir").value.trim(),
     prompt: af("prompt").value,
     schedule: {
@@ -327,6 +371,7 @@ $("#add-agent-create").addEventListener("click", async () => {
     toast(`Created ${d.label}`);
     addForm.style.display = "none";
     ["name", "model", "workdir", "prompt", "at", "every"].forEach(f => af(f).value = "");
+    af("engine").onchange();
     loadAgents();
   } catch (e) { toast("Error: " + e.message, 4000); }
   btn.disabled = false;
@@ -463,20 +508,24 @@ function toggleEngineEditor(chipEl) {
   const hostRow = chipEl.closest("tr");
   const tr = document.createElement("tr");
   tr.className = "editor editor-engine";
-  const options = ENGINES.map(e =>
-    `<option value="${esc(e)}" ${e === chipEl.dataset.engine ? "selected" : ""}>${esc(e)}</option>`).join("");
+  const options = engineOptions(chipEl.dataset.engine);
   tr.innerHTML = `<td colspan="5"><div class="editorbox"><div class="engineform">
     <label>Engine</label><select data-eng>${options}</select>
-    <label>Model</label><input data-mod value="${esc(chipEl.dataset.model)}"
-      placeholder="engine default">
+    <label>Model</label><span class="modelpick"><select data-mod-select></select><input data-mod
+      placeholder="model name" style="width:200px;display:none"><span class="muted" data-mod-note style="display:none;font-size:11px">set in engine config</span></span>
     <button class="act primary" data-save>Save</button>
     <button class="act" data-cancel>Close</button>
     <span class="muted" style="font-size:11px">applies on next run; services restart now</span>
   </div></div></td>`;
   hostRow.after(tr);
+  const engSel = tr.querySelector("[data-eng]");
+  const refill = current => fillModelPicker(tr.querySelector("[data-mod-select]"), tr.querySelector("[data-mod]"),
+    tr.querySelector("[data-mod-note]"), engSel.value, current);
+  refill(chipEl.dataset.model);
+  engSel.onchange = () => refill("");
   tr.querySelector("[data-save]").addEventListener("click", async () => {
-    const engine = tr.querySelector("[data-eng]").value;
-    const model = tr.querySelector("[data-mod]").value.trim();
+    const engine = engSel.value;
+    const model = pickedModel(tr.querySelector("[data-mod-select]"), tr.querySelector("[data-mod]"));
     try {
       const d = await api(`/api/registry/${encodeURIComponent(name)}`, {
         method: "POST",
@@ -561,19 +610,20 @@ async function loadSessions() {
   try { list = await api("/api/sessions?limit=60"); }
   catch (e) { $("#sessions").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`; return; }
   if (!list.length) {
-    $("#sessions").innerHTML = `<div class="empty">No Claude Code sessions found.</div>`;
+    $("#sessions").innerHTML = `<div class="empty">No sessions found.</div>`;
     return;
   }
-  let html = `<table><tr><th style="width:6%">Age</th><th style="width:18%">Project</th><th>Last prompt / summary</th><th style="width:8%">Branch</th><th style="text-align:right;width:16%">Actions</th></tr>`;
+  let html = `<table><tr><th style="width:6%">Age</th><th style="width:7%">Engine</th><th style="width:16%">Project</th><th>Last prompt / summary</th><th style="width:8%">Branch</th><th style="text-align:right;width:16%">Actions</th></tr>`;
   for (const s of list) {
     const proj = s.cwd ? s.cwd.split("/").filter(Boolean).pop() : s.project;
     html += `<tr class="rowhover">
       <td>${ageStr(s.mtime)}</td>
+      <td>${esc(s.engine || "claude")}</td>
       <td>${esc(proj)}<div class="sub">${esc(s.cwd || "")}</div></td>
       <td>${esc(s.title)}<div class="sub">${esc(s.id)}</div></td>
       <td>${esc(s.branch || "")}</td>
       <td class="actions">
-        <button class="act" data-copy="${esc(s.id)}" data-cwd="${esc(s.cwd || "")}">copy cmd</button>
+        <button class="act" data-copy="${esc(s.id)}" data-cwd="${esc(s.cwd || "")}" data-engine="${esc(s.engine || "claude")}">copy cmd</button>
         <button class="act primary" data-resume="${esc(s.id)}">resume</button>
       </td></tr>`;
   }
@@ -590,7 +640,8 @@ async function loadSessions() {
   }));
   $("#sessions").querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", () => {
     const cwd = btn.dataset.cwd;
-    const cmd = (cwd ? `cd '${cwd}' && ` : "") + `claude --resume ${btn.dataset.copy}`;
+    const resume = RESUME_CMD[btn.dataset.engine] || RESUME_CMD.claude;
+    const cmd = (cwd ? `cd '${cwd}' && ` : "") + resume(btn.dataset.copy);
     navigator.clipboard.writeText(cmd);
     toast("Copied: " + cmd, 3000);
   }));

@@ -161,6 +161,8 @@ Add your own engines in the config's `engines` table. `{model_args}` expands whe
 }
 ```
 
+The dashboard's engine dropdown marks engines whose CLI is not on the PATH as "not installed", and the model dropdown lists what each installed engine offers: Claude Code's current model IDs and aliases, Codex's configured default model, and the models `ollama list` reports. Pick "custom..." to type any other model name. To feed the picker for your own engine, add `"models": ["..."]` (a fixed list) or `"list_models": ["my-agent-cli", "models"]` (a command that prints one model per line) to its entry.
+
 Agents that run through a wrapper script receive `CORRAL_ENGINE`, `CORRAL_MODEL`, and `CORRAL_AGENT` as environment variables, so the wrapper can route to the right harness itself.
 
 **Caution:** engines differ in capability, not just in model quality. `claude`, `codex`, and `dsh` are agentic: they can read files and use tools. `ollama` is text in, text out. An agent whose prompt requires reading real data (calendars, email, files) produces fabricated output on a text-only engine.
@@ -186,7 +188,7 @@ corral agent add api-server --command "node ~/api/server.js" \
 The dashboard runs at http://127.0.0.1:8765 and has two views:
 
 - **Agents**: every agent grouped by name, with status, schedule, prompt chips that expand into an inline editor, engine chips, log viewers, and start, stop, and restart controls. The **Add Agent** button registers a new agent without touching the terminal.
-- **Sessions**: recent Claude Code sessions across all projects, with a resume button and a copy-command button for each.
+- **Sessions**: recent Claude Code and Codex sessions across all projects, with the engine, a resume button, and a copy-command button for each.
 
 By default Corral shows only the agents you registered with `corral agent add`. To also watch launchd jobs Corral did not create, add glob patterns for their labels to `launchagent_patterns` in the config.
 
@@ -208,7 +210,7 @@ cp -R plugin/skills/corral-agents ~/.claude/skills/
 
 ## Session recovery
 
-Claude Code writes each session transcript to `~/.claude/projects/<project>/<session-id>.jsonl`. Corral reads the head of each transcript to recover the working directory and the opening prompt, then opens a terminal window running:
+Claude Code writes each session transcript to `~/.claude/projects/<project>/<session-id>.jsonl`, and Codex writes `rollout-*.jsonl` files under `~/.codex/sessions/`. Corral reads the head of each transcript to recover the working directory and the opening prompt, then opens a terminal window running the engine's resume command, for example:
 
 ```bash
 cd <project directory> && claude --resume <session-id>
@@ -225,6 +227,7 @@ Corral reads `~/.config/corral/config.json`. Every key is optional.
 | `launchagent_patterns` | `[]` | Glob patterns for launchd jobs to show in addition to Corral-registered agents, e.g. `["com.me.nightly-*"]`. Empty shows only Corral agents. |
 | `prompt_dirs` | `[]` | Extra directories scanned for editable prompt files. The agents folder is always included. |
 | `claude_projects_dir` | `~/.claude/projects` | Where Claude Code stores session transcripts. |
+| `codex_sessions_dir` | `~/.codex/sessions` | Where Codex stores session transcripts. |
 | `web_host` | `127.0.0.1` | Dashboard bind address. Keep it on localhost. |
 | `web_port` | `8765` | Dashboard port. |
 | `terminal` | `auto` | `auto`, `iterm`, or `terminal`. Auto picks iTerm2 when installed. |
@@ -241,7 +244,7 @@ The web server binds to 127.0.0.1 and must stay there. Its API can start launchd
 Planned work lives in [ROADMAP.md](ROADMAP.md). Highlights:
 
 - An agent installation system (`corral agent install <repo>`) for sharing packaged agents
-- Session recovery for engines beyond Claude Code (Codex, DeepSeek Harness)
+- Session recovery for engines beyond Claude Code and Codex (DeepSeek Harness, aider)
 - A guided DeepSeek Harness setup, including its MCP tool bridge
 - Engine health checks surfaced in the dashboard
 

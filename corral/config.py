@@ -21,6 +21,8 @@ DEFAULTS = {
     "prompt_dirs": [],
     # Where Claude Code stores session transcripts.
     "claude_projects_dir": "~/.claude/projects",
+    # Where Codex stores its session transcripts (rollout-*.jsonl).
+    "codex_sessions_dir": "~/.codex/sessions",
     # Web dashboard bind address. Keep this on localhost: the API can
     # start processes and edit files.
     "web_host": "127.0.0.1",
@@ -38,6 +40,9 @@ DEFAULTS = {
     # {model_args} expands to model_args when the agent has a model,
     # and disappears otherwise. {model} and {prompt}/{prompt_file} are
     # substituted at run time. Add or override engines in your config.
+    # Optional "models" (static list) and "list_models" (a command that
+    # prints one model per line) feed the dashboard's model picker; see
+    # engines.py.
     "engines": {
         "claude": {
             "command": ["claude", "-p", "{model_args}", "{prompt}"],
@@ -49,6 +54,7 @@ DEFAULTS = {
         },
         "ollama": {
             "command": ["ollama", "run", "{model}", "{prompt}"],
+            "list_models": ["ollama", "list"],
         },
         "aider": {
             "command": ["aider", "{model_args}", "--message", "{prompt}", "--yes-always"],

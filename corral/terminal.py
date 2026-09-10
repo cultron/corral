@@ -15,11 +15,18 @@ def pick_terminal(preference="auto"):
     return "terminal"
 
 
-def resume_command(cwd, session_id):
+RESUME = {
+    "claude": "claude --resume {id}",
+    "codex": "codex resume {id}",
+}
+
+
+def resume_command(cwd, session_id, engine="claude"):
     parts = []
     if cwd and os.path.isdir(cwd):
         parts.append(f"cd {shlex.quote(cwd)}")
-    parts.append(f"claude --resume {shlex.quote(session_id)}")
+    template = RESUME.get(engine, RESUME["claude"])
+    parts.append(template.format(id=shlex.quote(session_id)))
     return " && ".join(parts)
 
 
