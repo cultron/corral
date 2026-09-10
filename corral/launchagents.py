@@ -87,8 +87,14 @@ def restart(label, plist_path):
     start(label, plist_path)
 
 
+_REGISTERED_PREFIX = "com.corral.agent."
+
+
 def friendly_name(label):
     """com.mavric.susie.morning-brief -> Susie / Morning Brief."""
+    if label.startswith(_REGISTERED_PREFIX):
+        name = label[len(_REGISTERED_PREFIX):]
+        return name.replace("-", " ").replace("_", " ").title()
     parts = label.split(".")
     if len(parts) > 2 and parts[0] in _TLD_PREFIXES:
         parts = parts[2:]
@@ -99,6 +105,8 @@ def friendly_name(label):
 def group_key(label):
     """Grouping key for the menu: the org-stripped first component when
     the label has sub-parts, else None (standalone)."""
+    if label.startswith(_REGISTERED_PREFIX):
+        return "corral"
     parts = label.split(".")
     if len(parts) > 2 and parts[0] in _TLD_PREFIXES:
         parts = parts[2:]

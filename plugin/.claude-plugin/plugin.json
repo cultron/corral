@@ -1,0 +1,6 @@
+{
+  "name": "corral",
+  "version": "0.3.0",
+  "description": "Manage Corral agents from Claude Code: register scheduled agents, edit their prompts, and sync them to launchd.",
+  "author": { "name": "Matt Cullerton" }
+}

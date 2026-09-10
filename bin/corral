@@ -1,0 +1,6 @@
+#!/bin/bash
+# Corral CLI shim. Safe to symlink anywhere on your PATH.
+SOURCE="${BASH_SOURCE[0]}"
+REPO="$(cd "$(dirname "$(readlink -f "$SOURCE")")/.." && pwd)"
+cd "$REPO"
+exec "$REPO/venv/bin/python3" -m corral "$@"

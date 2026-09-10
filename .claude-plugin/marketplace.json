@@ -1,0 +1,12 @@
+{
+  "name": "corral",
+  "owner": { "name": "Matt Cullerton" },
+  "plugins": [
+    {
+      "name": "corral",
+      "source": "./plugin",
+      "description": "Add and manage Corral agents: scheduled AI agents on macOS with launchd, editable prompts, and session recovery.",
+      "version": "0.3.0"
+    }
+  ]
+}

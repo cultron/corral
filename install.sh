@@ -53,6 +53,22 @@ echo "Done. Run directly with:"
 echo "  ${VENV_DIR}/bin/python3 -m corral"
 echo ""
 
+# Put the corral CLI on the PATH
+BIN_TARGET="${CORRAL_BIN_DIR:-}"
+if [ -z "${BIN_TARGET}" ]; then
+    for d in "$HOME/bin" "$HOME/.local/bin" "/usr/local/bin" "/opt/homebrew/bin"; do
+        case ":$PATH:" in *":$d:"*) [ -w "$d" ] && BIN_TARGET="$d" && break ;; esac
+    done
+fi
+if [ -n "${BIN_TARGET}" ] && [ "${BIN_TARGET}" != "skip" ]; then
+    ln -sf "${SCRIPT_DIR}/bin/corral" "${BIN_TARGET}/corral"
+    echo "Linked corral CLI: ${BIN_TARGET}/corral"
+else
+    echo "Add the CLI to your PATH with:"
+    echo "  ln -s ${SCRIPT_DIR}/bin/corral /usr/local/bin/corral"
+fi
+echo ""
+
 INSTALL_AGENT="${CORRAL_AUTOSTART:-ask}"
 if [ "${INSTALL_AGENT}" = "ask" ]; then
     read -p "Create a LaunchAgent so it starts at login? [y/N] " -n 1 -r

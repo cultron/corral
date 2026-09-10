@@ -43,6 +43,12 @@ def load_config():
         pass
     except Exception as e:
         print(f"corral: bad config at {CONFIG_PATH}: {e}")
+    # Registered agents are always visible and their prompts editable,
+    # regardless of the user's pattern list.
+    from .registry import AGENTS_DIR, LABEL_PREFIX
+    cfg["prompt_dirs"] = list(cfg["prompt_dirs"]) + [AGENTS_DIR]
+    if cfg["launchagent_patterns"]:
+        cfg["launchagent_patterns"] = list(cfg["launchagent_patterns"]) + [LABEL_PREFIX + "*"]
     return cfg
 
 
