@@ -34,9 +34,9 @@ Corral does three things:
 curl -fsSL https://raw.githubusercontent.com/cultron/corral/main/install-remote.sh | bash
 ```
 
-The script installs Corral into `~/.corral` (override with `CORRAL_DIR`), creates a virtual environment, builds `Corral.app`, writes a default config to `~/.config/corral/config.json`, links the `corral` command onto your PATH, and installs a LaunchAgent so Corral starts at login. Set `CORRAL_AUTOSTART=no` before the command to skip the LaunchAgent. Rerunning the command updates an existing install.
+The script installs Corral into `~/.corral` (override with `CORRAL_DIR`), creates a virtual environment, builds `Corral.app`, writes a default config to `~/.config/corral/config.json`, links the `corral` command onto your PATH, and sets Corral to start at login. Set `CORRAL_AUTOSTART=no` before the command to skip the start-at-login step. Rerunning the command updates an existing install.
 
-**Note:** review [install-remote.sh](install-remote.sh) before piping it to your shell. It only writes to the install directory, `~/.config/corral/`, your PATH directory, and `~/Library/LaunchAgents/`.
+**Note:** review [install-remote.sh](install-remote.sh) before piping it to your shell. It only writes to the install directory, `~/.config/corral/`, your PATH directory, and `~/Library/LaunchAgents/` (the macOS location for start-at-login items).
 
 ### Option 2: clone the repository
 
@@ -48,7 +48,7 @@ The script installs Corral into `~/.corral` (override with `CORRAL_DIR`), create
    ./install.sh
    ```
 
-2. When prompted, choose whether to install a LaunchAgent that starts Corral at login. If you decline, start Corral manually:
+2. When prompted, choose whether Corral should start at login. If you decline, start Corral manually:
 
    ```bash
    corral             # menu bar app and web dashboard
@@ -63,7 +63,7 @@ corral agent list
 
 The menu bar shows a text item such as `A 0/0`, and the dashboard is available at http://127.0.0.1:8765.
 
-To uninstall, run the uninstall script. It unloads Corral's LaunchAgents, removes the `corral` link, and deletes the install directory and `~/.config/corral/` (pass `--keep-config` to keep your config and agents):
+To uninstall, run the uninstall script. It removes the start-at-login item, stops and removes any agents registered with `corral agent add`, removes the `corral` link, and deletes the install directory and `~/.config/corral/` (pass `--keep-config` to keep your config and agents). Nothing else on the machine is touched:
 
 ```bash
 ~/.corral/uninstall.sh

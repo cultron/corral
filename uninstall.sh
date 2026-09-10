@@ -1,7 +1,7 @@
 #!/bin/bash
 # Uninstall Corral. Removes everything install.sh and the app create:
-#   - the menu bar LaunchAgent (~/Library/LaunchAgents/com.corral.menubar.plist)
-#   - LaunchAgents for registered agents (com.corral.agent.*.plist)
+#   - the start-at-login item for the menu bar app (~/Library/LaunchAgents/com.corral.menubar.plist)
+#   - the launchd plists for registered agents (~/Library/LaunchAgents/com.corral.agent.*.plist)
 #   - the `corral` CLI symlink, if it points into the install directory
 #   - the install directory itself (default ~/.corral; override with CORRAL_DIR)
 #   - ~/.config/corral (config and registered agent folders); pass --keep-config to keep it
@@ -30,12 +30,20 @@ echo "Uninstalling Corral from ${DEST}"
 # Stop the running app, if any.
 pkill -f "${DEST}/venv/bin/python3 -m corral" 2>/dev/null || true
 
-# Menu bar LaunchAgent and any registered agent plists.
-for plist in "${LAUNCH_AGENTS}/${PLIST_LABEL}.plist" "${LAUNCH_AGENTS}"/com.corral.agent.*.plist; do
+# Start-at-login item for the menu bar app.
+if [ -e "${LAUNCH_AGENTS}/${PLIST_LABEL}.plist" ]; then
+    launchctl unload "${LAUNCH_AGENTS}/${PLIST_LABEL}.plist" 2>/dev/null || true
+    rm -f "${LAUNCH_AGENTS}/${PLIST_LABEL}.plist"
+    echo "Removed Corral login item"
+fi
+
+# launchd plists for agents registered with `corral agent add`.
+for plist in "${LAUNCH_AGENTS}"/com.corral.agent.*.plist; do
     [ -e "${plist}" ] || continue
+    name="$(basename "${plist}" .plist)"; name="${name#com.corral.agent.}"
     launchctl unload "${plist}" 2>/dev/null || true
     rm -f "${plist}"
-    echo "Removed LaunchAgent $(basename "${plist}")"
+    echo "Removed agent ${name}"
 done
 
 # CLI symlink: only remove links that point into this install.

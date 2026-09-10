@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install Corral: venv, dependencies, .app bundle, optional LaunchAgent.
+# Install Corral: venv, dependencies, .app bundle, optional start-at-login.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -138,7 +138,7 @@ echo ""
 
 INSTALL_AGENT="${CORRAL_AUTOSTART:-ask}"
 if [ "${INSTALL_AGENT}" = "ask" ]; then
-    read -p "Create a LaunchAgent so it starts at login? [y/N] " -n 1 -r
+    read -p "Start Corral at login? [y/N] " -n 1 -r
     echo ""
     [[ $REPLY =~ ^[Yy]$ ]] && INSTALL_AGENT="yes" || INSTALL_AGENT="no"
 fi
@@ -172,5 +172,5 @@ if [ "${INSTALL_AGENT}" = "yes" ]; then
 EOF
     launchctl unload "${PLIST_PATH}" 2>/dev/null || true
     launchctl load "${PLIST_PATH}"
-    echo "LaunchAgent installed and loaded: ${PLIST_PATH}"
+    echo "Corral will start at login (login item: ${PLIST_PATH})"
 fi

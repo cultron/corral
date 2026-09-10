@@ -3,9 +3,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/cultron/corral/main/install-remote.sh | bash
 #
 # Clones (or updates) Corral into $CORRAL_DIR (default ~/.corral) and
-# runs the standard installer. When no terminal is attached, the
-# LaunchAgent is installed automatically; set CORRAL_AUTOSTART=no to
-# skip it.
+# runs the standard installer. When no terminal is attached, Corral is
+# set to start at login automatically; set CORRAL_AUTOSTART=no to skip
+# that.
 set -euo pipefail
 
 REPO_URL="https://github.com/cultron/corral"
