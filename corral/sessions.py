@@ -8,6 +8,7 @@ Every session dict carries an "engine" key ("claude" or "codex").
 """
 
 import glob
+import html
 import json
 import os
 import time
@@ -96,7 +97,8 @@ def _parse_codex_head(path, mtime):
         _cache[path] = (mtime, None)
         return None
 
-    title = " ".join((first_user_text or "(no prompt captured)").split())
+    # Codex Desktop transcripts carry HTML entities such as &#x20;
+    title = " ".join(html.unescape(first_user_text or "(no prompt captured)").split())
     if len(title) > 90:
         title = title[:87] + "..."
     meta = {
