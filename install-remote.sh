@@ -18,6 +18,10 @@ fi
 
 if [ -d "${DEST}/.git" ]; then
     echo "Updating existing Corral install at ${DEST}"
+    # The install dir holds no user data (config lives in ~/.config/corral),
+    # and older installers edited tracked files in place, so drop local
+    # edits before fast-forwarding.
+    git -C "${DEST}" checkout -q -- .
     git -C "${DEST}" pull --ff-only
 elif command -v git >/dev/null; then
     echo "Cloning Corral into ${DEST}"
