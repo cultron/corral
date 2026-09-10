@@ -75,7 +75,7 @@ corral agent add planner --prompt-text "Plan my day from ~/notes/today.md"
 
 ## Engines and models
 
-Every agent runs on an engine, which is the harness that drives the model. Built-ins: `claude` (default), `codex`, `ollama`, and `aider`. Pick one per agent, with an optional model:
+Every agent runs on an engine, which is the harness that drives the model. Built-ins: `claude` (default), `codex`, `ollama`, `aider`, and `dsh` (DeepSeek Harness, which selects its model in the dsh profile config). Pick one per agent, with an optional model:
 
 ```bash
 corral agent add summarizer --prompt ./prompt.md --at 07:30 \
@@ -91,8 +91,8 @@ Add your own engines in the config's `engines` table; `{model_args}` expands whe
 
 ```json
 "engines": {
-  "deepseek": {
-    "command": ["dsh", "exec", "{model_args}", "{prompt}"],
+  "my-harness": {
+    "command": ["my-agent-cli", "run", "{model_args}", "{prompt}"],
     "model_args": ["--model", "{model}"]
   }
 }

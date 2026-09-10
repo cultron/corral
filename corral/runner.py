@@ -1,6 +1,7 @@
 """Executes a registered agent. This is what the generated plists run."""
 
 import datetime
+import glob as globmod
 import os
 import subprocess
 import sys
@@ -52,6 +53,26 @@ def build_argv(cfg, engines, prompt, prompt_file):
     return argv
 
 
+def _augmented_path(path):
+    """Append common tool locations launchd's default PATH lacks.
+
+    Agents run under launchd, which starts jobs with a bare PATH, so
+    engines installed via Homebrew, npm/nvm, or pip --user would not be
+    found. An explicit PATH in the agent's env still wins; these are
+    appended after it.
+    """
+    parts = [p for p in path.split(":") if p]
+    extras = ["/opt/homebrew/bin", "/usr/local/bin",
+              os.path.expanduser("~/bin"), os.path.expanduser("~/.local/bin")]
+    # Newest installed node version first
+    extras += sorted(globmod.glob(os.path.expanduser("~/.nvm/versions/node/*/bin")),
+                     reverse=True)
+    for extra in extras:
+        if extra not in parts and os.path.isdir(extra):
+            parts.append(extra)
+    return ":".join(parts)
+
+
 def run(name):
     meta = registry.load(name)
     if meta is None or "config" not in meta:
@@ -73,6 +94,7 @@ def run(name):
     workdir = os.path.expanduser(cfg.get("workdir") or meta["dir"])
     env = dict(os.environ)
     env.update({k: str(v) for k, v in (cfg.get("env") or {}).items()})
+    env["PATH"] = _augmented_path(env.get("PATH", ""))
     # Wrapper scripts route on these, so an engine change in the
     # dashboard reaches agents that run through their own shell script.
     env["CORRAL_AGENT"] = name

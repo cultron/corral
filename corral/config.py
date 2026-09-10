@@ -52,6 +52,11 @@ DEFAULTS = {
             "command": ["aider", "{model_args}", "--message", "{prompt}", "--yes-always"],
             "model_args": ["--model", "{model}"],
         },
+        # DeepSeek Harness picks its model in the dsh profile config,
+        # so there is no model flag here.
+        "dsh": {
+            "command": ["dsh", "--profile", "headless", "{prompt}"],
+        },
     },
 }
 
