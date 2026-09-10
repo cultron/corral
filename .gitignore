@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 AgentMonitor.app/
 .DS_Store
+Corral.app/

@@ -29,8 +29,9 @@ DEFAULTS = {
     "terminal": "auto",
     # How many recent sessions to show in the menu bar dropdown.
     "menu_sessions": 12,
-    # Menu bar title prefix.
-    "menu_title": "A",
+    # Text shown between the corral icon and the running/total count.
+    # Empty by default; the icon identifies Corral.
+    "menu_title": "",
     # Engines an agent can run on. An agent with no explicit "command"
     # uses its "engine" (default claude) resolved through this table.
     # {model_args} expands to model_args when the agent has a model,

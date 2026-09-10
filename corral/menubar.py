@@ -1,11 +1,16 @@
 """macOS menu bar app (rumps) for agents and Claude Code sessions."""
 
+import os
 import subprocess
 import webbrowser
 
+import AppKit
 import rumps
 
 from . import launchagents, sessions, terminal
+
+ICON_PATH = os.path.join(os.path.dirname(__file__), "static", "menubar-icon.png")
+ICON_POINTS = 18  # menu bar icons are 18pt; the PNG is rendered at 2x
 
 STATUS_RUNNING = "●"   # filled circle
 STATUS_STOPPED = "○"   # empty circle
@@ -14,7 +19,14 @@ STATUS_ERROR = "◆"     # filled diamond
 
 class CorralApp(rumps.App):
     def __init__(self, cfg, web_url=None):
-        super().__init__("Agents", quit_button=None)
+        super().__init__("Corral", icon=ICON_PATH, template=True, quit_button=None)
+        # rumps shows the PNG at its pixel size; scale the 2x bitmap to 18pt.
+        image = getattr(self, "_icon_nsimage", None)
+        if image is not None:
+            image.setSize_((ICON_POINTS, ICON_POINTS))
+        # Menu bar only: keep Python's rocket icon out of the Dock.
+        AppKit.NSApplication.sharedApplication().setActivationPolicy_(
+            AppKit.NSApplicationActivationPolicyAccessory)
         self.cfg = cfg
         self.web_url = web_url
         self._build_menu()
@@ -42,7 +54,7 @@ class CorralApp(rumps.App):
                 running_count += 1 if is_running else 0
                 menu_items.append(item)
 
-        self.title = f"{self.cfg['menu_title']} {running_count}/{len(agents)}"
+        self.title = f"{self.cfg['menu_title']} {running_count}/{len(agents)}".strip()
 
         self.menu.clear()
         self.menu.add(rumps.MenuItem(

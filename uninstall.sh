@@ -28,7 +28,8 @@ KEEP_CONFIG=no
 echo "Uninstalling Corral from ${DEST}"
 
 # Stop the running app, if any.
-pkill -f "${DEST}/venv/bin/python3 -m corral" 2>/dev/null || true
+# (argv[0] may be the resolved framework binary rather than the venv path)
+pkill -f -- ' -m corral$' 2>/dev/null || true
 
 # Start-at-login item for the menu bar app.
 if [ -e "${LAUNCH_AGENTS}/${PLIST_LABEL}.plist" ]; then

@@ -34,7 +34,7 @@ Corral does three things:
 curl -fsSL https://raw.githubusercontent.com/cultron/corral/main/install-remote.sh | bash
 ```
 
-The script installs Corral into `~/.corral` (override with `CORRAL_DIR`), creates a virtual environment, builds `Corral.app`, writes a default config to `~/.config/corral/config.json`, links the `corral` command onto your PATH, and sets Corral to start at login. Set `CORRAL_AUTOSTART=no` before the command to skip the start-at-login step. Rerunning the command updates an existing install.
+The script installs Corral into `~/.corral` (override with `CORRAL_DIR`), creates a virtual environment, writes a default config to `~/.config/corral/config.json`, links the `corral` command onto your PATH, and sets Corral to start at login. Set `CORRAL_AUTOSTART=no` before the command to skip the start-at-login step. Rerunning the command updates an existing install.
 
 **Note:** review [install-remote.sh](install-remote.sh) before piping it to your shell. It only writes to the install directory, `~/.config/corral/`, your PATH directory, and `~/Library/LaunchAgents/` (the macOS location for start-at-login items).
 
@@ -229,7 +229,7 @@ Corral reads `~/.config/corral/config.json`. Every key is optional.
 | `web_port` | `8765` | Dashboard port. |
 | `terminal` | `auto` | `auto`, `iterm`, or `terminal`. Auto picks iTerm2 when installed. |
 | `menu_sessions` | `12` | Sessions shown in the menu bar dropdown. |
-| `menu_title` | `A` | Menu bar title prefix. |
+| `menu_title` | `""` | Text shown between the corral icon and the running/total count. |
 | `engines` | built-ins | Engine table; your entries extend the built-ins. |
 
 ## Security

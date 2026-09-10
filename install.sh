@@ -1,10 +1,9 @@
 #!/bin/bash
-# Install Corral: venv, dependencies, .app bundle, optional start-at-login.
+# Install Corral: venv, dependencies, optional start-at-login.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${SCRIPT_DIR}/venv"
-APP_DIR="${SCRIPT_DIR}/Corral.app"
 PLIST_LABEL="${CORRAL_LABEL:-com.corral.menubar}"
 PLIST_PATH="${HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
 
@@ -88,32 +87,11 @@ fi
 echo "Writing default config if missing..."
 "${VENV_DIR}/bin/python3" -c "from corral.config import write_default_config, CONFIG_PATH; created = write_default_config(); print(('Created ' if created else 'Kept existing ') + CONFIG_PATH)"
 
-echo "Building app bundle..."
-mkdir -p "${APP_DIR}/Contents/MacOS" "${SCRIPT_DIR}/logs"
-cat > "${APP_DIR}/Contents/Info.plist" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleName</key>
-    <string>Corral</string>
-    <key>CFBundleIdentifier</key>
-    <string>${PLIST_LABEL}</string>
-    <key>CFBundleVersion</key>
-    <string>0.2.0</string>
-    <key>CFBundleExecutable</key>
-    <string>launch</string>
-    <key>LSUIElement</key>
-    <true/>
-</dict>
-</plist>
-EOF
-cat > "${APP_DIR}/Contents/MacOS/launch" << EOF
-#!/bin/bash
-cd "${SCRIPT_DIR}"
-exec "${VENV_DIR}/bin/python3" -m corral
-EOF
-chmod +x "${APP_DIR}/Contents/MacOS/launch"
+# Earlier versions built a Corral.app wrapper here. Launching through it
+# (open -W + a shell script that execs Python) left the menu bar item
+# unhosted on macOS 26, so the login item now runs Python directly.
+rm -rf "${SCRIPT_DIR}/Corral.app"
+mkdir -p "${SCRIPT_DIR}/logs"
 
 echo ""
 echo "Done. Run directly with:"
@@ -153,10 +131,12 @@ if [ "${INSTALL_AGENT}" = "yes" ]; then
     <string>${PLIST_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/open</string>
-        <string>-W</string>
-        <string>${APP_DIR}</string>
+        <string>${VENV_DIR}/bin/python3</string>
+        <string>-m</string>
+        <string>corral</string>
     </array>
+    <key>WorkingDirectory</key>
+    <string>${SCRIPT_DIR}</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
