@@ -22,7 +22,7 @@ Corral does three things:
 ## Requirements
 
 - macOS
-- Python 3.9 or later
+- Python 3.10 or later (`brew install python`). The Xcode-bundled Python 3.9 also works; the installer pins pyobjc 11.x there because pyobjc 12 has no 3.9 wheels.
 - [Claude Code](https://claude.com/claude-code) for the default agent engine and for session recovery
 - Optional: iTerm2 (Corral falls back to Terminal), and any additional engines you plan to use: [Codex CLI](https://github.com/openai/codex), [Ollama](https://ollama.com), [Aider](https://aider.chat), or [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 

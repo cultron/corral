@@ -12,7 +12,7 @@ REPO_URL="https://github.com/cultron/corral"
 DEST="${CORRAL_DIR:-$HOME/.corral}"
 
 if ! command -v python3 >/dev/null; then
-    echo "corral: python3 is required. Install the Xcode Command Line Tools or Python 3.9+." >&2
+    echo "corral: python3 is required. Install Python 3.10+ (brew install python) or the Xcode Command Line Tools." >&2
     exit 1
 fi
 

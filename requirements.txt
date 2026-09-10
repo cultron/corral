@@ -1,1 +1,6 @@
 rumps>=0.4.0
+# pyobjc 12.x ships no prebuilt wheels for Python 3.9 (pyobjc-core 12.0 is
+# source-only there and fails to compile with recent Xcode clang), so keep
+# the 11.x line, which has wheels, on 3.9.
+pyobjc-core<12; python_version < "3.10"
+pyobjc-framework-Cocoa<12; python_version < "3.10"
