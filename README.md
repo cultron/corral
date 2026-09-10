@@ -18,7 +18,7 @@ Corral does three things:
 ## Install the app
 
 ```bash
-git clone https://github.com/YOURNAME/corral.git
+git clone https://github.com/cultron/corral.git
 cd corral
 ./install.sh
 ```
@@ -111,7 +111,7 @@ corral agent add api-server --command "node ~/api/server.js" \
 The repo doubles as a Claude Code plugin marketplace. Install it and Claude can register agents for you from a conversation ("add an agent that summarizes my inbox every morning at 8"):
 
 ```
-/plugin marketplace add YOURNAME/corral
+/plugin marketplace add cultron/corral
 /plugin install corral@corral
 ```
 
