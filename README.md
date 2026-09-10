@@ -63,7 +63,17 @@ corral agent list
 
 The menu bar shows a text item such as `A 0/0`, and the dashboard is available at http://127.0.0.1:8765.
 
-To uninstall, unload the LaunchAgent from `~/Library/LaunchAgents/`, then delete the install directory and `~/.config/corral/`.
+To uninstall, run the uninstall script. It unloads Corral's LaunchAgents, removes the `corral` link, and deletes the install directory and `~/.config/corral/` (pass `--keep-config` to keep your config and agents):
+
+```bash
+~/.corral/uninstall.sh
+```
+
+Or without a local copy:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cultron/corral/main/uninstall.sh | bash
+```
 
 ## Quick start
 
