@@ -5,7 +5,51 @@ import os
 import subprocess
 import sys
 
-from . import registry
+from . import config, registry
+
+
+class EngineError(Exception):
+    pass
+
+
+def build_argv(cfg, engines, prompt, prompt_file):
+    """Resolve the agent's argv.
+
+    An explicit "command" wins. Otherwise the agent's "engine" (default
+    claude) is looked up in the engines table. {model_args} expands to
+    the engine's model_args when a model is set and disappears
+    otherwise; {model}, {prompt}, and {prompt_file} are substituted
+    everywhere.
+    """
+    model = cfg.get("model") or ""
+    command = cfg.get("command")
+    if not command:
+        engine = cfg.get("engine") or "claude"
+        spec = engines.get(engine)
+        if spec is None:
+            raise EngineError(
+                f"unknown engine {engine!r}; known: {', '.join(sorted(engines))}"
+            )
+        model = model or spec.get("default_model") or ""
+        command = []
+        for arg in spec["command"]:
+            if arg == "{model_args}":
+                if model:
+                    command.extend(spec.get("model_args", []))
+                continue
+            command.append(arg)
+
+    argv = []
+    for arg in command:
+        if "{model}" in arg and not model:
+            raise EngineError(
+                "this agent's command needs a model; set \"model\" in agent.json"
+            )
+        arg = arg.replace("{model}", model)
+        arg = arg.replace("{prompt_file}", prompt_file or "")
+        arg = arg.replace("{prompt}", prompt)
+        argv.append(arg)
+    return argv
 
 
 def run(name):
@@ -20,21 +64,26 @@ def run(name):
         with open(meta["prompt_path"]) as f:
             prompt = f.read()
 
-    argv = []
-    for arg in (cfg.get("command") or registry.DEFAULT_COMMAND):
-        arg = arg.replace("{prompt_file}", meta["prompt_path"] or "")
-        arg = arg.replace("{prompt}", prompt)
-        argv.append(arg)
+    try:
+        argv = build_argv(cfg, config.load_config()["engines"], prompt, meta["prompt_path"])
+    except EngineError as e:
+        print(f"corral run {name}: {e}", file=sys.stderr)
+        return 2
 
     workdir = os.path.expanduser(cfg.get("workdir") or meta["dir"])
     env = dict(os.environ)
     env.update({k: str(v) for k, v in (cfg.get("env") or {}).items()})
+    # Wrapper scripts route on these, so an engine change in the
+    # dashboard reaches agents that run through their own shell script.
+    env["CORRAL_AGENT"] = name
+    env["CORRAL_ENGINE"] = cfg.get("engine") or "claude"
+    if cfg.get("model"):
+        env["CORRAL_MODEL"] = cfg["model"]
 
     # Services (keep-alive, or anything with a KeepAlive override) replace
     # this process entirely, so launchd signals the daemon itself and
     # stop/restart cannot orphan a child. Output goes to the launchd logs.
-    is_service = cfg.get("keep_alive") or "KeepAlive" in (cfg.get("launchd_extra") or {})
-    if is_service:
+    if registry.is_service(cfg):
         os.chdir(workdir)
         os.execvpe(argv[0], argv, env)
 

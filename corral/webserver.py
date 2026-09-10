@@ -10,7 +10,7 @@ import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import launchagents, prompts, sessions, terminal
+from . import launchagents, prompts, registry, sessions, terminal
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
@@ -60,6 +60,8 @@ def make_handler(cfg):
                 return self._serve_index()
             if path == "/api/agents":
                 return self._api_agents()
+            if path == "/api/engines":
+                return self._send_json(sorted(cfg["engines"]))
             if path == "/api/sessions":
                 limit = int(query.get("limit", ["50"])[0])
                 return self._send_json(
@@ -83,6 +85,9 @@ def make_handler(cfg):
             # /api/sessions/<id>/resume
             if len(parts) == 4 and parts[:2] == ["api", "sessions"] and parts[3] == "resume":
                 return self._api_session_resume(parts[2])
+            # /api/registry/<name>  (update engine/model)
+            if len(parts) == 3 and parts[:2] == ["api", "registry"]:
+                return self._api_registry_update(parts[2])
             self._send_error_json("not found", 404)
 
         def do_PUT(self):
@@ -111,7 +116,7 @@ def make_handler(cfg):
                 pid, exit_code, loaded, running, error = launchagents.agent_status(
                     a["label"], status_map
                 )
-                out.append({
+                entry = {
                     "label": a["label"],
                     "name": launchagents.friendly_name(a["label"]),
                     "group": launchagents.group_key(a["label"]),
@@ -125,8 +130,42 @@ def make_handler(cfg):
                     "stdout_log": a["stdout_log"],
                     "stderr_log": a["stderr_log"],
                     "plist_path": a["plist_path"],
-                })
+                }
+                if a["label"].startswith(registry.LABEL_PREFIX):
+                    name = a["label"][len(registry.LABEL_PREFIX):]
+                    meta = registry.load(name)
+                    if meta and "config" in meta:
+                        rcfg = meta["config"]
+                        entry["registry_name"] = name
+                        entry["engine"] = rcfg.get("engine") or "claude"
+                        entry["model"] = rcfg.get("model") or ""
+                        entry["has_command"] = bool(rcfg.get("command"))
+                        entry["is_service"] = registry.is_service(rcfg)
+                out.append(entry)
             self._send_json(out)
+
+        def _api_registry_update(self, name):
+            body = self._read_body()
+            fields = {}
+            if "engine" in body:
+                engine = body["engine"] or None
+                if engine and engine not in cfg["engines"]:
+                    return self._send_error_json(f"unknown engine {engine!r}", 400)
+                fields["engine"] = engine
+            if "model" in body:
+                fields["model"] = body["model"] or None
+            if not fields:
+                return self._send_error_json("nothing to update", 400)
+            try:
+                new_cfg = registry.update_fields(name, **fields)
+            except registry.RegistryError as e:
+                return self._send_error_json(str(e), 404)
+            # Scheduled agents read agent.json on their next run; only a
+            # running service needs a bounce to pick the change up.
+            restarted = False
+            if registry.is_service(new_cfg):
+                restarted = registry.restart_job(name)
+            self._send_json({"ok": True, "restarted": restarted})
 
         def _api_agent_action(self, label, action):
             agent = self._find_agent(label)

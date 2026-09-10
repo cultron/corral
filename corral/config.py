@@ -31,6 +31,28 @@ DEFAULTS = {
     "menu_sessions": 12,
     # Menu bar title prefix.
     "menu_title": "A",
+    # Engines an agent can run on. An agent with no explicit "command"
+    # uses its "engine" (default claude) resolved through this table.
+    # {model_args} expands to model_args when the agent has a model,
+    # and disappears otherwise. {model} and {prompt}/{prompt_file} are
+    # substituted at run time. Add or override engines in your config.
+    "engines": {
+        "claude": {
+            "command": ["claude", "-p", "{model_args}", "{prompt}"],
+            "model_args": ["--model", "{model}"],
+        },
+        "codex": {
+            "command": ["codex", "exec", "{model_args}", "{prompt}"],
+            "model_args": ["--model", "{model}"],
+        },
+        "ollama": {
+            "command": ["ollama", "run", "{model}", "{prompt}"],
+        },
+        "aider": {
+            "command": ["aider", "{model_args}", "--message", "{prompt}", "--yes-always"],
+            "model_args": ["--model", "{model}"],
+        },
+    },
 }
 
 
@@ -43,6 +65,10 @@ def load_config():
         pass
     except Exception as e:
         print(f"corral: bad config at {CONFIG_PATH}: {e}")
+    # User engines extend the built-ins instead of replacing the table
+    engines = dict(DEFAULTS["engines"])
+    engines.update(cfg.get("engines") or {})
+    cfg["engines"] = engines
     # Registered agents are always visible and their prompts editable,
     # regardless of the user's pattern list.
     from .registry import AGENTS_DIR, LABEL_PREFIX

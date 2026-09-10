@@ -80,7 +80,7 @@ def load(name):
 
 def add(name, prompt_text=None, command=None, schedule=None,
         interval_seconds=None, keep_alive=False, workdir=None, env=None,
-        description="", launchd_extra=None):
+        description="", launchd_extra=None, engine=None, model=None):
     """Create the agent folder. Fails if the agent already exists."""
     validate_name(name)
     d = agent_dir(name)
@@ -89,7 +89,9 @@ def add(name, prompt_text=None, command=None, schedule=None,
     os.makedirs(os.path.join(d, "logs"))
     cfg = {
         "description": description,
-        "command": command,          # null means DEFAULT_COMMAND
+        "command": command,          # null means: build from engine
+        "engine": engine,            # null means claude
+        "model": model,              # null means the engine's default
         "schedule": schedule,        # launchd StartCalendarInterval dict or list
         "interval_seconds": interval_seconds,
         "keep_alive": bool(keep_alive),
@@ -105,6 +107,34 @@ def add(name, prompt_text=None, command=None, schedule=None,
     with open(os.path.join(d, "prompt.md"), "w") as f:
         f.write(prompt_text or "")
     return load(name)
+
+
+def is_service(cfg):
+    """True for agents launchd supervises as long-running processes."""
+    return bool(cfg.get("keep_alive")) or "KeepAlive" in (cfg.get("launchd_extra") or {})
+
+
+def update_fields(name, **fields):
+    """Update keys in an agent's agent.json. Returns the new config."""
+    meta = load(name)
+    if meta is None or "config" not in meta:
+        raise RegistryError(f"no registered agent named {name!r}")
+    cfg = meta["config"]
+    cfg.update(fields)
+    with open(os.path.join(agent_dir(name), "agent.json"), "w") as f:
+        json.dump(cfg, f, indent=2)
+        f.write("\n")
+    return cfg
+
+
+def restart_job(name):
+    """Kill and relaunch a service's launchd job. Returns True on success."""
+    label = LABEL_PREFIX + name
+    result = subprocess.run(
+        ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{label}"],
+        capture_output=True, timeout=15,
+    )
+    return result.returncode == 0
 
 
 def remove(name, purge=False):

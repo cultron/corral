@@ -35,7 +35,9 @@ corral agent add queue-worker --prompt /tmp/prompt.md --every 900
 corral agent add watcher --prompt /tmp/prompt.md --keep-alive
 ```
 
-Useful flags: `--command "..."` to override the default `claude -p '{prompt}'` (the placeholders `{prompt}` and `{prompt_file}` are substituted at run time), `--workdir DIR` for where the command runs, `--env K=V` (repeatable), `--description "..."`.
+Useful flags: `--engine claude|codex|ollama|aider` and `--model NAME` pick the harness and model (default engine is claude); `--command "..."` overrides the engine template entirely (the placeholders `{prompt}`, `{prompt_file}`, and `{model}` are substituted at run time); `--workdir DIR` for where the command runs; `--env K=V` (repeatable); `--description "..."`.
+
+To change an agent's engine or model later, edit `engine`/`model` in its `agent.json` (no sync needed; the runner reads it at run time), or use the gear chip on the agent's row in the web dashboard. Wrapper scripts receive the choice as `CORRAL_ENGINE` / `CORRAL_MODEL` env vars.
 
 3. `add` installs and loads the launchd plist automatically. Verify with:
 

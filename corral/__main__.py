@@ -35,8 +35,12 @@ def main():
     add_p.add_argument("name", help="lowercase letters, digits, - and _")
     add_p.add_argument("--prompt", help="path to a prompt file to copy in")
     add_p.add_argument("--prompt-text", help="inline prompt text")
-    add_p.add_argument("--command", help="shell-style command; {prompt} and "
-                       "{prompt_file} are substituted (default: claude -p '{prompt}')")
+    add_p.add_argument("--command", help="shell-style command; {prompt}, "
+                       "{prompt_file}, and {model} are substituted "
+                       "(default: built from --engine)")
+    add_p.add_argument("--engine", help="harness to run on: claude (default), "
+                       "codex, ollama, aider, or any engine in your config")
+    add_p.add_argument("--model", help="model passed to the engine")
     add_p.add_argument("--at", help="daily run time, HH:MM")
     add_p.add_argument("--weekday", help="restrict --at to a weekday (mon..sun)")
     add_p.add_argument("--every", type=int, metavar="SECONDS",
@@ -137,6 +141,8 @@ def agent_add(args):
         env=env,
         description=args.description,
         launchd_extra=extra,
+        engine=args.engine,
+        model=args.model,
     )
     print(f"registered {args.name} at {meta['dir']}")
     if args.no_sync:

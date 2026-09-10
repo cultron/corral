@@ -73,12 +73,32 @@ corral agent add watcher --prompt ./prompt.md --keep-alive
 corral agent add planner --prompt-text "Plan my day from ~/notes/today.md"
 ```
 
-The default command is `claude -p '{prompt}'`. Override it with `--command`; the placeholders `{prompt}` and `{prompt_file}` are substituted when the agent runs, so any CLI works:
+## Engines and models
+
+Every agent runs on an engine, which is the harness that drives the model. Built-ins: `claude` (default), `codex`, `ollama`, and `aider`. Pick one per agent, with an optional model:
 
 ```bash
 corral agent add summarizer --prompt ./prompt.md --at 07:30 \
-  --command "ollama run qwen3 {prompt}"
+  --engine ollama --model qwen3-coder:30b
+
+corral agent add reviewer --prompt ./prompt.md --at 09:00 \
+  --engine claude --model claude-sonnet-4-6
 ```
+
+You can also change engine and model from the web dashboard: click the gear chip on an agent's row, pick the engine, and save. Scheduled agents use the new choice on their next run, since the runner reads `agent.json` at run time. Keep-alive services are restarted immediately.
+
+Add your own engines in the config's `engines` table; `{model_args}` expands when a model is set and disappears otherwise:
+
+```json
+"engines": {
+  "deepseek": {
+    "command": ["dsh", "exec", "{model_args}", "{prompt}"],
+    "model_args": ["--model", "{model}"]
+  }
+}
+```
+
+For full control, set an explicit `--command`; the placeholders `{prompt}`, `{prompt_file}`, and `{model}` are substituted when the agent runs. Agents that run through a wrapper script also receive `CORRAL_ENGINE`, `CORRAL_MODEL`, and `CORRAL_AGENT` as environment variables, so the wrapper can route to the right harness itself.
 
 Other commands:
 

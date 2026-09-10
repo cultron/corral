@@ -115,6 +115,16 @@ td.actions button { margin-left: 6px; }
 }
 .chip::before { content: "¶ "; color: var(--amber-dim); }
 .chip:hover, .chip.open { border-color: var(--amber); color: var(--amber); }
+.chip.engine::before { content: "⚙ "; color: var(--amber-dim); }
+.engineform { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
+.engineform select, .engineform input {
+  font-family: var(--mono); font-size: 12px; color: var(--text);
+  background: var(--bg-raised); border: 1px solid var(--line-bright);
+  padding: 4px 8px; outline: none;
+}
+.engineform select:focus, .engineform input:focus { border-color: var(--amber); }
+.engineform input { width: 260px; }
+.engineform label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); }
 tr.editor td { background: var(--bg-inset); padding: 0; }
 .editorbox { display: flex; flex-direction: column; border-left: 2px solid var(--amber-dim); }
 .editorbox .ebar {
@@ -231,6 +241,8 @@ $("#drawer-close").addEventListener("click", () => $("#drawer").classList.remove
 
 /* -------- agents + prompts (one view) -------- */
 let openEditorPath = null;  // survives refresh: reopen the same editor
+let ENGINES = ["claude"];
+api("/api/engines").then(e => ENGINES = e).catch(() => {});
 
 async function loadAgents() {
   let agents, promptFiles;
@@ -242,6 +254,9 @@ async function loadAgents() {
   }
   if (openEditorPath && $("#agents").querySelector("tr.editor textarea")?.dataset.dirty === "1") {
     return;  // never clobber unsaved edits on auto-refresh
+  }
+  if ($("#agents").querySelector("tr.editor-engine")) {
+    return;  // engine editor open; do not clobber it
   }
 
   const running = agents.filter(a => a.running).length;
@@ -300,11 +315,18 @@ function agentRow(a, prompts) {
   const status = a.running ? `PID ${esc(a.pid)}`
     : a.error ? `exit ${esc(a.exit_code)}`
     : a.loaded ? "loaded" : "not loaded";
+  let engineChip = "";
+  if (a.registry_name && !a.is_service) {
+    const text = esc(a.engine) + (a.model ? " · " + esc(a.model) : "");
+    engineChip = `<span class="chip engine" data-engine-edit="${esc(a.registry_name)}"
+      data-engine="${esc(a.engine)}" data-model="${esc(a.model)}"
+      title="Engine and model for this agent. Wrapper commands receive it as CORRAL_ENGINE / CORRAL_MODEL.">${text}</span>`;
+  }
   return `<tr class="rowhover">
     <td><span class="dot ${dot}"></span>${esc(a.name)}<div class="sub">${esc(a.label)}</div></td>
     <td>${status}${a.keep_alive ? '<div class="sub">keepalive</div>' : ""}</td>
     <td>${esc(a.schedule)}</td>
-    <td>${prompts.length ? prompts.map(chip).join("") : '<span class="muted">none</span>'}</td>
+    <td>${prompts.length ? prompts.map(chip).join("") : '<span class="muted">none</span>'}${engineChip}</td>
     <td class="actions">
       ${a.stdout_log ? `<button class="act" data-log="${esc(a.label)}" data-which="stdout">log</button>` : ""}
       ${a.stderr_log ? `<button class="act" data-log="${esc(a.label)}" data-which="stderr">err</button>` : ""}
@@ -335,7 +357,53 @@ function wireAgents() {
       openDrawer(d.path, d.content || "(empty)");
     } catch (e) { toast("Error: " + e.message); }
   }));
-  root.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => toggleEditor(c)));
+  root.querySelectorAll(".chip:not(.engine)").forEach(c => c.addEventListener("click", () => toggleEditor(c)));
+  root.querySelectorAll(".chip.engine").forEach(c => c.addEventListener("click", () => toggleEngineEditor(c)));
+}
+
+function toggleEngineEditor(chipEl) {
+  const existing = $("#agents").querySelector("tr.editor");
+  const wasOpen = chipEl.classList.contains("open");
+  if (existing) {
+    existing.remove();
+    $("#agents").querySelectorAll(".chip.open").forEach(c => c.classList.remove("open"));
+    openEditorPath = null;
+    if (wasOpen) return;
+  }
+  chipEl.classList.add("open");
+  const name = chipEl.dataset.engineEdit;
+  const hostRow = chipEl.closest("tr");
+  const tr = document.createElement("tr");
+  tr.className = "editor editor-engine";
+  const options = ENGINES.map(e =>
+    `<option value="${esc(e)}" ${e === chipEl.dataset.engine ? "selected" : ""}>${esc(e)}</option>`).join("");
+  tr.innerHTML = `<td colspan="5"><div class="editorbox"><div class="engineform">
+    <label>Engine</label><select data-eng>${options}</select>
+    <label>Model</label><input data-mod value="${esc(chipEl.dataset.model)}"
+      placeholder="engine default">
+    <button class="act primary" data-save>Save</button>
+    <button class="act" data-cancel>Close</button>
+    <span class="muted" style="font-size:11px">applies on next run; services restart now</span>
+  </div></div></td>`;
+  hostRow.after(tr);
+  tr.querySelector("[data-save]").addEventListener("click", async () => {
+    const engine = tr.querySelector("[data-eng]").value;
+    const model = tr.querySelector("[data-mod]").value.trim();
+    try {
+      const d = await api(`/api/registry/${encodeURIComponent(name)}`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ engine, model }),
+      });
+      toast(`${name}: ${engine}${model ? " · " + model : ""}${d.restarted ? " (restarted)" : ""}`);
+      tr.remove();
+      loadAgents();
+    } catch (e) { toast("Error: " + e.message, 4000); }
+  });
+  tr.querySelector("[data-cancel]").addEventListener("click", () => {
+    tr.remove();
+    chipEl.classList.remove("open");
+  });
 }
 
 async function toggleEditor(chipEl) {
