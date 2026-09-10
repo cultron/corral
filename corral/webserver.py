@@ -58,6 +58,8 @@ def make_handler(cfg):
 
             if path in ("/", "/index.html"):
                 return self._serve_index()
+            if path in ("/favicon.ico", "/favicon.png"):
+                return self._serve_static("favicon.png", "image/png")
             if path == "/api/agents":
                 return self._api_agents()
             if path == "/api/engines":
@@ -101,13 +103,16 @@ def make_handler(cfg):
 
         # -- endpoints -----------------------------------------------
         def _serve_index(self):
+            return self._serve_static("index.html", "text/html; charset=utf-8")
+
+        def _serve_static(self, name, content_type):
             try:
-                with open(os.path.join(STATIC_DIR, "index.html"), "rb") as f:
+                with open(os.path.join(STATIC_DIR, name), "rb") as f:
                     body = f.read()
             except OSError:
-                return self._send_error_json("index.html missing", 500)
+                return self._send_error_json(f"{name} missing", 500)
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

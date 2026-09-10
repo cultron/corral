@@ -1,6 +1,9 @@
 """Render the Corral menu bar icon (a fenced corral) as a template PNG.
 
-Usage: venv/bin/python3 tools/make_menubar_icon.py [OUT.png] [SCALE]
+Usage: venv/bin/python3 tools/make_menubar_icon.py [OUT.png] [SCALE] [#RRGGBB]
+
+The optional colour renders a coloured (non-template) copy, used for the
+dashboard's PNG favicon: tools/make_menubar_icon.py corral/static/favicon.png 3.5556 '#ffb347'
 
 Draws with AppKit so no extra dependencies are needed. The output is a
 black-on-transparent template image; macOS recolors it for light/dark
@@ -15,7 +18,7 @@ import AppKit
 SIZE = 18  # points
 
 
-def draw(scale):
+def draw(scale, color=None):
     px = int(SIZE * scale)
     rep = AppKit.NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(
         None, px, px, 8, 4, True, False, AppKit.NSCalibratedRGBColorSpace, 0, 0)
@@ -28,7 +31,11 @@ def draw(scale):
     xf.scaleBy_(scale)
     xf.concat()
 
-    AppKit.NSColor.blackColor().set()
+    if color:
+        r, g, b = (int(color.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(r, g, b, 1.0).set()
+    else:
+        AppKit.NSColor.blackColor().set()
 
     def Y(y):  # design coordinates are y-down; AppKit is y-up
         return SIZE - y
@@ -79,7 +86,8 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
         os.path.dirname(__file__), "..", "corral", "static", "menubar-icon.png")
     scale = float(sys.argv[2]) if len(sys.argv) > 2 else 2.0
-    rep = draw(scale)
+    color = sys.argv[3] if len(sys.argv) > 3 else None
+    rep = draw(scale, color)
     data = rep.representationUsingType_properties_(AppKit.NSBitmapImageFileTypePNG, None)
     data.writeToFile_atomically_(out, True)
     print(f"wrote {out} ({rep.pixelsWide()}x{rep.pixelsHigh()})")
