@@ -8,6 +8,11 @@ Corral does three things:
 2. **Lets you manage agents anywhere.** Start, stop, and restart agents, edit their prompts, and switch the model they run on, from the menu bar or from a browser.
 3. **Recovers lost Claude Code sessions.** When your laptop restarts and your terminal sessions die, Corral lists every recent session and reopens any of them in iTerm2 or Terminal, in the right directory, with one click.
 
+<p align="center">
+  <img src="docs/img/dashboard.png" width="68%" alt="Corral web dashboard showing agents grouped with status, schedules, prompt chips, and engine chips">
+  <img src="docs/img/menubar.png" width="24%" alt="Corral menu bar dropdown showing agent status dots, the Claude Sessions submenu, and dashboard controls">
+</p>
+
 ## How it works
 
 - Each agent is a plain folder in `~/.config/corral/agents/<name>/` that holds its config, prompt, and logs. Corral generates one launchd job per agent from these folders.
@@ -23,15 +28,25 @@ Corral does three things:
 
 ## Install Corral
 
-1. Clone the repository and run the installer:
+### Option 1: one-line install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cultron/corral/main/install-remote.sh | bash
+```
+
+The script installs Corral into `~/.corral` (override with `CORRAL_DIR`), creates a virtual environment, builds `Corral.app`, writes a default config to `~/.config/corral/config.json`, links the `corral` command onto your PATH, and installs a LaunchAgent so Corral starts at login. Set `CORRAL_AUTOSTART=no` before the command to skip the LaunchAgent. Rerunning the command updates an existing install.
+
+**Note:** review [install-remote.sh](install-remote.sh) before piping it to your shell. It only writes to the install directory, `~/.config/corral/`, your PATH directory, and `~/Library/LaunchAgents/`.
+
+### Option 2: clone the repository
+
+1. Clone and run the installer:
 
    ```bash
    git clone https://github.com/cultron/corral.git
    cd corral
    ./install.sh
    ```
-
-   The installer creates a virtual environment, builds `Corral.app`, writes a default config to `~/.config/corral/config.json`, and links the `corral` command onto your PATH.
 
 2. When prompted, choose whether to install a LaunchAgent that starts Corral at login. If you decline, start Corral manually:
 
@@ -40,15 +55,15 @@ Corral does three things:
    corral --web-only  # dashboard only
    ```
 
-3. Verify the installation:
+### Verify the installation
 
-   ```bash
-   corral agent list
-   ```
+```bash
+corral agent list
+```
 
-   The menu bar shows a text item such as `A 0/0`, and the dashboard is available at http://127.0.0.1:8765.
+The menu bar shows a text item such as `A 0/0`, and the dashboard is available at http://127.0.0.1:8765.
 
-To uninstall, unload the LaunchAgent, delete the repository, and delete `~/.config/corral/`.
+To uninstall, unload the LaunchAgent from `~/Library/LaunchAgents/`, then delete the install directory and `~/.config/corral/`.
 
 ## Quick start
 
