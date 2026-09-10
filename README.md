@@ -188,7 +188,7 @@ The dashboard runs at http://127.0.0.1:8765 and has two views:
 - **Agents**: every agent grouped by name, with status, schedule, prompt chips that expand into an inline editor, engine chips, log viewers, and start, stop, and restart controls. The **Add Agent** button registers a new agent without touching the terminal.
 - **Sessions**: recent Claude Code sessions across all projects, with a resume button and a copy-command button for each.
 
-The dashboard can also show LaunchAgents that Corral does not manage. Add glob patterns to `launchagent_patterns` in the config to include them.
+By default Corral shows only the agents you registered with `corral agent add`. To also watch launchd jobs Corral did not create, add glob patterns for their labels to `launchagent_patterns` in the config.
 
 ## Claude Code plugin
 
@@ -222,7 +222,7 @@ Corral reads `~/.config/corral/config.json`. Every key is optional.
 
 | Key | Default | Description |
 |---|---|---|
-| `launchagent_patterns` | `[]` | Glob patterns for extra LaunchAgents to show. Corral-registered agents always appear. An empty list shows all non-Apple agents. |
+| `launchagent_patterns` | `[]` | Glob patterns for launchd jobs to show in addition to Corral-registered agents, e.g. `["com.me.nightly-*"]`. Empty shows only Corral agents. |
 | `prompt_dirs` | `[]` | Extra directories scanned for editable prompt files. The agents folder is always included. |
 | `claude_projects_dir` | `~/.claude/projects` | Where Claude Code stores session transcripts. |
 | `web_host` | `127.0.0.1` | Dashboard bind address. Keep it on localhost. |

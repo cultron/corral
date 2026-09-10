@@ -10,9 +10,10 @@ import os
 CONFIG_PATH = os.path.expanduser("~/.config/corral/config.json")
 
 DEFAULTS = {
-    # Glob patterns matched against LaunchAgent labels (the plist filename
-    # without .plist). Empty list means: show every plist in
-    # ~/Library/LaunchAgents except Apple's own.
+    # Extra glob patterns matched against LaunchAgent labels (the plist
+    # filename without .plist). Agents registered with `corral agent add`
+    # (com.corral.agent.*) are always shown; add patterns here to also
+    # watch launchd jobs Corral did not create, e.g. "com.me.nightly-*".
     "launchagent_patterns": [],
     # Directories scanned recursively for prompt/context files (.md, .txt)
     # editable in the web dashboard. Files referenced directly in an
@@ -79,8 +80,7 @@ def load_config():
     # regardless of the user's pattern list.
     from .registry import AGENTS_DIR, LABEL_PREFIX
     cfg["prompt_dirs"] = list(cfg["prompt_dirs"]) + [AGENTS_DIR]
-    if cfg["launchagent_patterns"]:
-        cfg["launchagent_patterns"] = list(cfg["launchagent_patterns"]) + [LABEL_PREFIX + "*"]
+    cfg["launchagent_patterns"] = list(cfg["launchagent_patterns"]) + [LABEL_PREFIX + "*"]
     return cfg
 
 

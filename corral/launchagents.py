@@ -14,19 +14,23 @@ WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 _TLD_PREFIXES = {"com", "org", "net", "io", "ai", "dev", "app", "us", "co", "me", "homebrew"}
 
 
-def get_agents(patterns):
-    """Return parsed plists for LaunchAgents matching the label patterns.
+MENUBAR_LABEL = "com.corral.menubar"  # Corral's own login item; never listed
 
-    With no patterns, every non-Apple plist in ~/Library/LaunchAgents is
-    included.
+
+def get_agents(patterns):
+    """Return parsed plists for LaunchAgents whose label matches a pattern.
+
+    Only matching plists are shown; config.load_config always adds the
+    pattern for Corral-registered agents, so with no extra patterns the
+    list is exactly the agents created with `corral agent add`. Corral's
+    own login item is never included.
     """
     agents = []
     for plist_path in sorted(glob.glob(os.path.join(LAUNCHAGENTS_DIR, "*.plist"))):
         name = os.path.basename(plist_path)[: -len(".plist")]
-        if patterns:
-            if not any(fnmatch.fnmatch(name, p) for p in patterns):
-                continue
-        elif name.startswith("com.apple."):
+        if name == MENUBAR_LABEL:
+            continue
+        if not any(fnmatch.fnmatch(name, p) for p in patterns):
             continue
         try:
             with open(plist_path, "rb") as f:
