@@ -22,10 +22,14 @@ def discover(prompt_dirs, agents):
                 real = os.path.realpath(arg)
                 seen[real] = _entry(real, "plist", agent["label"])
 
+    from .registry import AGENTS_DIR, LABEL_PREFIX
+    registry_root = os.path.realpath(AGENTS_DIR)
+
     for d in prompt_dirs:
         root = os.path.expanduser(d)
         if not os.path.isdir(root):
             continue
+        is_registry = os.path.realpath(root) == registry_root
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [n for n in dirnames if not n.startswith(".")]
             for name in sorted(filenames):
@@ -34,10 +38,14 @@ def discover(prompt_dirs, agents):
                 real = os.path.realpath(os.path.join(dirpath, name))
                 if real not in seen:
                     # First subdirectory under the prompt dir names the
-                    # agent group, e.g. prompts/susie/brief.md -> susie
+                    # agent group, e.g. prompts/susie/brief.md -> susie.
+                    # Inside the registry it names the agent itself.
                     rel = os.path.relpath(real, os.path.realpath(root))
                     group = rel.split(os.sep)[0] if os.sep in rel else None
-                    seen[real] = _entry(real, "prompt_dir", None, group)
+                    if is_registry and group:
+                        seen[real] = _entry(real, "registry", LABEL_PREFIX + group)
+                    else:
+                        seen[real] = _entry(real, "prompt_dir", None, group)
                 if len(seen) >= MAX_FILES:
                     break
 
