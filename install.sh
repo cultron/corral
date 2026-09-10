@@ -151,6 +151,9 @@ if [ "${INSTALL_AGENT}" = "yes" ]; then
 </plist>
 EOF
     launchctl unload "${PLIST_PATH}" 2>/dev/null || true
+    # Older login items launched via `open`, so unloading them left the
+    # Python process behind. Stop any running copy before starting the new one.
+    pkill -f -- ' -m corral$' 2>/dev/null || true
     launchctl load "${PLIST_PATH}"
     echo "Corral will start at login (login item: ${PLIST_PATH})"
 fi
