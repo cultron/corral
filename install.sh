@@ -1,14 +1,14 @@
 #!/bin/bash
-# Install Agent Monitor: venv, dependencies, .app bundle, optional LaunchAgent.
+# Install Corral: venv, dependencies, .app bundle, optional LaunchAgent.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${SCRIPT_DIR}/venv"
-APP_DIR="${SCRIPT_DIR}/AgentMonitor.app"
-PLIST_LABEL="${AGENT_MONITOR_LABEL:-com.agentmonitor.menubar}"
+APP_DIR="${SCRIPT_DIR}/Corral.app"
+PLIST_LABEL="${CORRAL_LABEL:-com.corral.menubar}"
 PLIST_PATH="${HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
 
-echo "Setting up Agent Monitor..."
+echo "Setting up Corral..."
 
 if [ ! -d "${VENV_DIR}" ]; then
     echo "Creating virtual environment..."
@@ -19,7 +19,7 @@ echo "Installing dependencies..."
 "${VENV_DIR}/bin/pip" install -q -r "${SCRIPT_DIR}/requirements.txt"
 
 echo "Writing default config if missing..."
-"${VENV_DIR}/bin/python3" -c "from agentmonitor.config import write_default_config, CONFIG_PATH; created = write_default_config(); print(('Created ' if created else 'Kept existing ') + CONFIG_PATH)"
+"${VENV_DIR}/bin/python3" -c "from corral.config import write_default_config, CONFIG_PATH; created = write_default_config(); print(('Created ' if created else 'Kept existing ') + CONFIG_PATH)"
 
 echo "Building app bundle..."
 mkdir -p "${APP_DIR}/Contents/MacOS" "${SCRIPT_DIR}/logs"
@@ -29,7 +29,7 @@ cat > "${APP_DIR}/Contents/Info.plist" << EOF
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>AgentMonitor</string>
+    <string>Corral</string>
     <key>CFBundleIdentifier</key>
     <string>${PLIST_LABEL}</string>
     <key>CFBundleVersion</key>
@@ -44,16 +44,16 @@ EOF
 cat > "${APP_DIR}/Contents/MacOS/launch" << EOF
 #!/bin/bash
 cd "${SCRIPT_DIR}"
-exec "${VENV_DIR}/bin/python3" -m agentmonitor
+exec "${VENV_DIR}/bin/python3" -m corral
 EOF
 chmod +x "${APP_DIR}/Contents/MacOS/launch"
 
 echo ""
 echo "Done. Run directly with:"
-echo "  ${VENV_DIR}/bin/python3 -m agentmonitor"
+echo "  ${VENV_DIR}/bin/python3 -m corral"
 echo ""
 
-INSTALL_AGENT="${AGENT_MONITOR_AUTOSTART:-ask}"
+INSTALL_AGENT="${CORRAL_AUTOSTART:-ask}"
 if [ "${INSTALL_AGENT}" = "ask" ]; then
     read -p "Create a LaunchAgent so it starts at login? [y/N] " -n 1 -r
     echo ""

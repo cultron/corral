@@ -204,7 +204,7 @@ def start_in_thread(cfg):
             (cfg["web_host"], cfg["web_port"]), make_handler(cfg)
         )
     except OSError as e:
-        print(f"agent-monitor: web dashboard not started: {e}")
+        print(f"corral: web dashboard not started: {e}")
         return None
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

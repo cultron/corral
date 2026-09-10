@@ -1,13 +1,13 @@
 """Configuration loading.
 
-Config lives at ~/.config/agent-monitor/config.json. Missing keys fall
+Config lives at ~/.config/corral/config.json. Missing keys fall
 back to defaults, so a partial config file is fine.
 """
 
 import json
 import os
 
-CONFIG_PATH = os.path.expanduser("~/.config/agent-monitor/config.json")
+CONFIG_PATH = os.path.expanduser("~/.config/corral/config.json")
 
 DEFAULTS = {
     # Glob patterns matched against LaunchAgent labels (the plist filename
@@ -42,7 +42,7 @@ def load_config():
     except FileNotFoundError:
         pass
     except Exception as e:
-        print(f"agent-monitor: bad config at {CONFIG_PATH}: {e}")
+        print(f"corral: bad config at {CONFIG_PATH}: {e}")
     return cfg
 
 

@@ -12,7 +12,7 @@ STATUS_STOPPED = "○"   # empty circle
 STATUS_ERROR = "◆"     # filled diamond
 
 
-class AgentMonitorApp(rumps.App):
+class CorralApp(rumps.App):
     def __init__(self, cfg, web_url=None):
         super().__init__("Agents", quit_button=None)
         self.cfg = cfg
@@ -149,7 +149,7 @@ class AgentMonitorApp(rumps.App):
     def _cb(self, fn, label, plist_path, message):
         def callback(_):
             fn(label, plist_path)
-            rumps.notification("Agent Monitor", message, "", sound=False)
+            rumps.notification("Corral", message, "", sound=False)
             self._build_menu()
         return callback
 
@@ -169,14 +169,14 @@ class AgentMonitorApp(rumps.App):
             cmd = terminal.resume_command(session["cwd"], session["id"])
             ok, err = terminal.open_in_terminal(cmd, self.cfg["terminal"])
             if not ok:
-                rumps.notification("Agent Monitor", "Resume failed", err, sound=False)
+                rumps.notification("Corral", "Resume failed", err, sound=False)
         return callback
 
     def _copy_cb(self, session):
         def callback(_):
             cmd = terminal.resume_command(session["cwd"], session["id"])
             terminal.copy_to_clipboard(cmd)
-            rumps.notification("Agent Monitor", "Copied", cmd, sound=False)
+            rumps.notification("Corral", "Copied", cmd, sound=False)
         return callback
 
     def _reveal_cb(self, path):

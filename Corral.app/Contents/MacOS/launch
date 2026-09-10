@@ -1,0 +1,3 @@
+#!/bin/bash
+cd "/Users/matthewcullerton/projects/corral"
+exec "/Users/matthewcullerton/projects/corral/venv/bin/python3" -m corral

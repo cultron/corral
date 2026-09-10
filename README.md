@@ -1,4 +1,4 @@
-# Agent Monitor
+# Corral
 
 A macOS menu bar app and local web dashboard for managing launchd agents and Claude Code sessions.
 
@@ -26,25 +26,25 @@ If you run scheduled Claude Code agents through launchd, or you lose terminal se
 ## Install
 
 ```bash
-git clone https://github.com/YOURNAME/claude-agent-monitor.git
-cd claude-agent-monitor
+git clone https://github.com/YOURNAME/corral.git
+cd corral
 ./install.sh
 ```
 
-The installer creates a venv, builds `AgentMonitor.app`, writes a default config, and offers to install a LaunchAgent so the app starts at login.
+The installer creates a venv, builds `Corral.app`, writes a default config, and offers to install a LaunchAgent so the app starts at login.
 
 Run it manually without installing the LaunchAgent:
 
 ```bash
-./venv/bin/python3 -m agentmonitor            # menu bar + web dashboard
-./venv/bin/python3 -m agentmonitor --web-only # dashboard only, no menu bar
+./venv/bin/python3 -m corral            # menu bar + web dashboard
+./venv/bin/python3 -m corral --web-only # dashboard only, no menu bar
 ```
 
 The dashboard is at http://127.0.0.1:8765 by default.
 
 ## Configuration
 
-Config lives at `~/.config/agent-monitor/config.json`. Every key is optional.
+Config lives at `~/.config/corral/config.json`. Every key is optional.
 
 ```json
 {
@@ -65,7 +65,7 @@ Config lives at `~/.config/agent-monitor/config.json`. Every key is optional.
 
 ## How session resume works
 
-Claude Code writes each session transcript to `~/.claude/projects/<project>/<session-id>.jsonl`. Agent Monitor reads the head of each transcript to recover the working directory and the first prompt, then opens a terminal window running:
+Claude Code writes each session transcript to `~/.claude/projects/<project>/<session-id>.jsonl`. Corral reads the head of each transcript to recover the working directory and the first prompt, then opens a terminal window running:
 
 ```bash
 cd <project directory> && claude --resume <session-id>
